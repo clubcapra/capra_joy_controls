@@ -4,7 +4,7 @@
 #include <string>
 #include <variant>
 #include <yaml-cpp/yaml.h>
-// #include <typeinfo>
+#include <typeinfo>
 
 #include "capra_joy_controls/params_helper.hpp"
 #include "capra_joy_controls/types.hpp"
@@ -127,7 +127,7 @@ public:
         const std::runtime_error* inner = nullptr) 
     : YAMLParseException(node,
         "Invalid enum value '" + entry +
-        "' for enum '" + /*typeid(TEnum).name() + */
+        "' for enum '" + typeid(TEnum).name() +
         "'. Allowed values: " + join(allowedValues, ", "),
         inner
     ) {}
@@ -175,7 +175,7 @@ class YAMLInvalidFieldType : public YAMLParseException {
 public:
     explicit YAMLInvalidFieldType(const YAML::Node& node, const std::runtime_error* inner = nullptr) 
     : YAMLParseException(node,
-        "Invalid value type for field '" + node.Tag() + "'. Expected '" + /*typeid(TField).name() + */"'",
+        "Invalid value type for field '" + node.Tag() + "'. Expected '" + typeid(TField).name() + "'",
         inner
     ) {}
 };

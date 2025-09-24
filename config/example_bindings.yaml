@@ -136,5 +136,9 @@ parent:
         - button: 5
       while_true: 1 # Value               | Optional (default:1)
       while_false: 0 # Value              | Optional (default:0)
-
+      while_true:
+        condition:
+          conditions:
+            - button: 8
+          
 
