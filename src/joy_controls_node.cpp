@@ -4,14 +4,13 @@
 #include <string>
 #include <variant>
 #include <yaml-cpp/yaml.h>
-#include <typeinfo>
-
-#include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/bool.hpp"
-#include "geometry_msgs/msg/twist.hpp"
-#include "sensor_msgs/msg/joy.hpp"
+// #include <typeinfo>
 
 #include "capra_joy_controls/params_helper.hpp"
+#include "capra_joy_controls/types.hpp"
+#include "capra_joy_controls/utils.hpp"
+#include "capra_joy_controls/yaml.hpp"
+
 
 namespace capra_joy_controls {
 
@@ -25,9 +24,9 @@ using Joy = sensor_msgs::msg::Joy;
 using Bool = std_msgs::msg::Bool;
 
 template <typename TIter, typename TValue>
-int index_of(TIter begin, TIter end, const TValue& val) {
-    if (auto match std::find(begin, end, val); match != end) {
-        return (int)(match - start);
+inline int index_of(TIter begin, TIter end, const TValue& val) {
+    if (auto match = std::find(begin, end, val); match != end) {
+        return (int)(match - begin);
     }
     return -1;
 }
@@ -81,7 +80,8 @@ private:
     }
 };
 
-inline std::string join(const std::vector<std::string>& parts, const std::string& sep) {
+template <typename T>
+inline std::string join(const std::vector<T>& parts, const std::string& sep) {
     std::ostringstream oss;
     for (size_t i = 0; i < parts.size(); ++i) {
         if (i > 0) oss << sep;
@@ -127,7 +127,7 @@ public:
         const std::runtime_error* inner = nullptr) 
     : YAMLParseException(node,
         "Invalid enum value '" + entry +
-        "' for enum '" + typeid(TEnum).name() +
+        "' for enum '" + /*typeid(TEnum).name() + */
         "'. Allowed values: " + join(allowedValues, ", "),
         inner
     ) {}
@@ -174,8 +174,8 @@ template <typename TField>
 class YAMLInvalidFieldType : public YAMLParseException {
 public:
     explicit YAMLInvalidFieldType(const YAML::Node& node, const std::runtime_error* inner = nullptr) 
-    : YAMLParseException(
-        "Invalid value type for field '" + node.Tag() + "'. Expected '" + typeid(TField).name() + "'",
+    : YAMLParseException(node,
+        "Invalid value type for field '" + node.Tag() + "'. Expected '" + /*typeid(TField).name() + */"'",
         inner
     ) {}
 };
@@ -190,7 +190,9 @@ public:
     ) {}
     explicit YAMLInvalidValue(const YAML::Node& node, const TValue& value, const TValue& min, const TValue& max, const std::runtime_error* inner = nullptr)
     : YAMLParseException(node,
-        "Invalid value for field '" + node.Tag() + "' expected one of [" + join(allowedValues, ", ") + "' got '" + node.Scalar() + "'",
+        (std::ostringstream() << "Invalid value for field '" << node.Tag() << 
+        "' expected a value between '" << min << "' and '" << max << 
+        "' got '" << node.Scalar() << "'").str(),
         inner
     ) {}
 };
@@ -259,14 +261,14 @@ inline TEnum parse_any_enum(const YAML::Node& node, const std::string& value, co
             return (TEnum)i;
         }
     }
-    throw YAMLInvalidEnumValue<TEnum>(value, values);
+    throw YAMLInvalidEnumValue<TEnum>(node, value, values);
 }
 
 template <typename TEnum>
 inline TEnum parse_any_enum(const YAML::Node& node, const std::vector<std::string>& values) {
     expect_not_null(node);
     expect_node_type(node, YAML::NodeType::Scalar);
-    return parse_Any_enum<TEnum>(node, node.Scalar(), values);
+    return parse_any_enum<TEnum>(node, node.Scalar(), values);
 }
 
 #define YAML_ENUM(name, ...) \
@@ -281,8 +283,8 @@ name parse_enum_##name(const YAML::Node& node, const std::string& value) { \
 }
 
 struct YAMLParsable {
-    YAMLParsable() {  }
-    YAMLParsable(const YAML::Node& node) { parse_from(node); }
+    YAMLParsable() = default;
+    virtual ~YAMLParsable() = default;
     virtual void parse_from(const YAML::Node& node) = 0;
 };
 
@@ -340,13 +342,13 @@ parent:
 */
 struct Trigger : YAMLParsable {
        struct Off : YAMLParsable {
-           Off() {}
-           Off(const YAML::Node& node) : YAMLParsable(node) {}
+           Off() = default;
+           explicit Off(const YAML::Node& node) { parse_from(node); }
         void parse_from(const YAML::Node& node) override { }
     };
     struct On : YAMLParsable {
-        On() {}
-        On(const YAML::Node& node) : YAMLParsable(node) {}
+        On() = default;
+        explicit On(const YAML::Node& node) { parse_from(node); }
         void parse_from(const YAML::Node& node) override { }
     };
     
@@ -361,11 +363,11 @@ struct Trigger : YAMLParsable {
         btn_id id = -1;
         ButtonEventType event = ButtonEventType::held;
 
-        Button() {}
+        Button() = default;
         Button(const btn_id& id = -1, const ButtonEventType& event = ButtonEventType::held) 
             : id{id}, event{event} {}
         
-        Button(const YAML::Node& node) : YAMLParsable(node) {}
+        explicit Button(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override {
             expect_not_null(node);
@@ -409,10 +411,10 @@ struct Trigger : YAMLParsable {
         float min = NAN;
         float max = NAN;
 
-        AxisRange() {}
+        AxisRange() = default;
         AxisRange(const axis_id& id, const AxisRangeEventType& event, const float& min = NAN, const float& max = NAN) 
             : id{id}, event{event}, min{min}, max{max} {}
-        AxisRange(const YAML::Node& node) : YAMLParsable(node) {}
+        explicit AxisRange(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override {
             expect_not_null(node);
@@ -449,7 +451,7 @@ struct Trigger : YAMLParsable {
         Trigger *while_true = nullptr;
         Trigger *while_false = nullptr;
 
-        Condition() {}
+        Condition() = default;
         Condition(const std::vector<Trigger>& conditions, const Trigger& while_true = Trigger::On(), const Trigger& while_false = Trigger::Off()) 
         : conditions(conditions), while_true(new Trigger(while_true)), while_false(new Trigger(while_false)) {}
     
@@ -462,7 +464,7 @@ struct Trigger : YAMLParsable {
                 while_false = new Trigger(*other.while_false);
             }
         }
-        Condition(const YAML::Node& node) : YAMLParsable(node) {}
+        explicit Condition(const YAML::Node& node) { parse_from(node); }
 
         void set_while_true(Trigger* trigger) {
             if (while_true) {
@@ -534,7 +536,7 @@ struct Trigger : YAMLParsable {
         Button,
         AxisRange,
         Condition
-    > value;
+    > value{Off()};
 
     static Trigger create_off(const Off& _off = Off()) { return {_off}; }
     static Trigger create_on(const On& _on = On()) { return {_on}; }
@@ -573,7 +575,7 @@ struct Trigger : YAMLParsable {
         return *this;
     }
 
-    Trigger() : value{Off()} {}
+    Trigger() = default;
     Trigger(const bool& state) {
         if (state) { value = On(); }
         else { value = Off(); }
@@ -583,7 +585,7 @@ struct Trigger : YAMLParsable {
     Trigger(const Button& _button) : value{_button} {}
     Trigger(const AxisRange& _axis_range) : value{_axis_range} {}
     Trigger(const Condition& _condition) : value{_condition} {}
-    Trigger(const YAML::Node& node) : YAMLParsable(node) {}
+    explicit Trigger(const YAML::Node& node) { parse_from(node); }
 
     void parse_from(const YAML::Node& node) override {
         expect_defined(node);
@@ -672,9 +674,9 @@ parent:
 struct Value : YAMLParsable {
     struct Constant : YAMLParsable {
         float value = 0;
-        Constant() {}
+        Constant() = default;
         Constant(const float& value) : value{value} {}
-        Constant(const YAML::Node& node) : YAMLParsable(node) {}
+        explicit Constant(const YAML::Node& node) { parse_from(node); }
         void parse_from(const YAML::Node& node) override {
             expect_not_null(node);
             expect_defined(node);
@@ -686,10 +688,10 @@ struct Value : YAMLParsable {
         axis_id id = -1;
         float min = NAN;
         float max = NAN;
-        Axis() {}
+        Axis() = default;
         Axis(const axis_id& id, const float& min = NAN, const float& max = NAN) 
         : id{id}, min{min}, max{max} {}
-        Axis(const YAML::Node& node) : YAMLParsable(node) {}
+        explicit Axis(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override {
             expect_not_null(node);
@@ -713,7 +715,7 @@ struct Value : YAMLParsable {
         Value* while_true = nullptr;
         Value* while_false = nullptr;
 
-        Condition() {}
+        Condition() = default;
         Condition(const std::vector<Trigger>& conditions, const Value& while_true = Value::Constant(1), const Value& while_false = Value::Constant(0)) 
         : conditions(conditions), while_true(new Value(while_true)), while_false(new Value(while_false)) {}
     
@@ -726,7 +728,7 @@ struct Value : YAMLParsable {
                 while_false = new Value(*other.while_false);
             }
         }
-        Condition(const YAML::Node& node) : YAMLParsable(node) {}
+        explicit Condition(const YAML::Node& node) { parse_from(node); }
 
         void set_while_true(Value* value) {
             if (while_true) {
@@ -794,7 +796,7 @@ struct Value : YAMLParsable {
         Constant,
         Axis,
         Condition
-    > value;
+    > value{Constant(0)};
     
     static Value create_constant(const Constant& _constant) { return {_constant}; }
     static Value create_constant(const float& _constant) { return create_constant(Constant(_constant)); }
@@ -817,11 +819,12 @@ struct Value : YAMLParsable {
         return *this;
     }
 
-    Value(const float& _constant = 0) : value{Constant(_constant)} {}
+    Value() = default;
+    Value(const float& _constant) : value{Constant(_constant)} {}
     Value(const Constant& _constant) : value{_constant} {}
     Value(const Axis& _axis) : value{_axis} {}
     Value(const Condition& _condition) : value{_condition} {}
-    Value(const YAML::Node& node) : YAMLParsable(node) {}
+    explicit Value(const YAML::Node& node) { parse_from(node); }
 
     void parse_from(const YAML::Node& node) override {
         expect_defined(node);
@@ -869,7 +872,7 @@ struct Action : YAMLParsable {
                 Value yaw = 0, pitch = 0, roll = 0;
                 Angular(const Value& yaw = 0, const Value& pitch = 0, const Value& roll = 0)
                 : yaw{yaw}, pitch{pitch}, roll{roll} {}
-                Angular(const YAML::Node& node) : YAMLParsable(node) {}
+                explicit Angular(const YAML::Node& node) { parse_from(node); }
 
                 void parse_from(const YAML::Node& node) override {
                     expect_not_null(node);
@@ -891,7 +894,7 @@ struct Action : YAMLParsable {
                 Value x = 0, y = 0, z = 0; 
                 Linear(const Value& x = 0, const Value& y = 0, const Value& z = 0)
                 : x{x}, y{y}, z{z} {}
-                Linear(const YAML::Node& node) : YAMLParsable(node) {}
+                explicit Linear(const YAML::Node& node) { parse_from(node); }
 
                 void parse_from(const YAML::Node& node) override {
                     expect_not_null(node);
@@ -918,8 +921,8 @@ struct Action : YAMLParsable {
 
             TeleopTwistJoy() {}
             TeleopTwistJoy(
-                const Angular& axis_angular = {0, 0, 0},
-                const Linear& axis_linear = {0, 0, 0},
+                const Angular& axis_angular,
+                const Linear& axis_linear,
                 const Angular& scale_angular = {1, 1, 1},
                 const Linear& scale_linear = {1, 1, 1},
                 const Angular& scale_angular_turbo = {1, 1, 1},
@@ -931,7 +934,7 @@ struct Action : YAMLParsable {
                 scale_angular_turbo{scale_angular_turbo},
                 scale_linear_turbo{scale_linear_turbo} 
                 {}
-            TeleopTwistJoy(const YAML::Node& node) : YAMLParsable(node) {}
+            explicit TeleopTwistJoy(const YAML::Node& node) { parse_from(node); }
 
             void parse_from(const YAML::Node& node) override {
                 expect_not_null(node);
@@ -965,10 +968,10 @@ struct Action : YAMLParsable {
             Value turn_multiplier = 0;
             Value wheel_radius = 0;
 
-            Tank() {}
+            Tank() = default;
             Tank(
-                const Value& left = 0,
-                const Value& right = 0,
+                const Value& left,
+                const Value& right,
                 const Value& scale = 1,
                 const Value& scale_turbo = 1,
                 const Value& wheel_separation = 0,
@@ -984,7 +987,7 @@ struct Action : YAMLParsable {
                 wheel_radius{wheel_radius}
             {}
 
-            Tank(const YAML::Node& node) : YAMLParsable(node) {}
+            explicit Tank(const YAML::Node& node) { parse_from(node); }
 
             void parse_from(const YAML::Node& node) override {
                 expect_not_null(node);
@@ -1018,9 +1021,9 @@ struct Action : YAMLParsable {
         std::variant<
             TeleopTwistJoy,
             Tank>
-            value;
+            value{TeleopTwistJoy()};
 
-        TwistPub() {}
+        TwistPub() = default;
         TwistPub(
             const TeleopTwistJoy& twist,
             const std::string& topic = "~/cmd_vel",
@@ -1048,7 +1051,7 @@ struct Action : YAMLParsable {
         publish_stamped_twist{publish_stamped_twist}
         {}
 
-        TwistPub(const YAML::Node& node) : YAMLParsable(node) {}
+        explicit TwistPub(const YAML::Node& node) { parse_from(node); }
 
         static TwistPub create_teleop_twist_joy(
             const TeleopTwistJoy& twist,
@@ -1131,18 +1134,19 @@ struct Action : YAMLParsable {
             Value front_right = 0;
             Value rear_right = 0;
 
+            Flippers() {}
             Flippers(
-                const Value& front_left = 0,
-                const Value& rear_left = 0,
-                const Value& front_right = 0,
-                const Value& rear_right = 0
+                const Value& front_left,
+                const Value& rear_left,
+                const Value& front_right,
+                const Value& rear_right
             ) : 
                 front_left{front_left},
                 rear_left{rear_left},
                 front_right{front_right},
                 rear_right{rear_right} 
             {}
-            Flippers(const YAML::Node& node) : YAMLParsable(node) {}
+            explicit Flippers(const YAML::Node& node) { parse_from(node); }
 
             void parse_from(const YAML::Node& node) override {
                 expect_not_null(node);
@@ -1168,10 +1172,10 @@ struct Action : YAMLParsable {
             Trigger trigger{};
             Flippers positions{};
 
-            Preset() {}
-            Preset(const std::string& name, const Trigger& trigger, const Flippers& positions)
+            Preset() = default;
+            Preset(const std::string& name, const Trigger& trigger = Trigger(), const Flippers& positions = Flippers())
             : name{name}, trigger{trigger}, positions{positions} {}
-            Preset(const YAML::Node& node) : YAMLParsable(node) {}
+            explicit Preset(const YAML::Node& node) { parse_from(node); }
             void parse_from(const YAML::Node& node) override {
                 expect_not_null(node);
                 expect_defined(node);
@@ -1191,9 +1195,10 @@ struct Action : YAMLParsable {
             std::string name = "";
             Flippers velocities{};
 
-            Movement(const std::string& name = "", const Flippers& velocities = {})
+            Movement() = default;
+            Movement(const std::string& name, const Flippers& velocities = {})
             : name{name}, velocities{velocities} {}
-            Movement(const YAML::Node& node) : YAMLParsable(node) {}
+            explicit Movement(const YAML::Node& node) { parse_from(node); }
 
             void parse_from(const YAML::Node& node) override {
                 expect_not_null(node);
@@ -1211,10 +1216,10 @@ struct Action : YAMLParsable {
         std::vector<Preset> presets{};
         std::vector<Movement> movements{};
 
-        FlippersPub() {}
-        FlippersPub(const std::string& topic = "~/flippers", const std::vector<Preset>& presets = {}, const std::vector<Movement>& movements = {})
+        FlippersPub() = default;
+        FlippersPub(const std::string& topic, const std::vector<Preset>& presets = {}, const std::vector<Movement>& movements = {})
         : topic{topic}, presets{presets}, movements{movements} {}
-        FlippersPub(const YAML::Node& node) : YAMLParsable(node) {}
+        explicit FlippersPub(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override {
             expect_not_null(node);
@@ -1247,10 +1252,10 @@ struct Action : YAMLParsable {
     struct EStopPub : YAMLParsable {
         std::string topic = "~/estop";
         Trigger trigger = 0;
-        EStopPub() {}
+        EStopPub() = default;
         EStopPub(const std::string& topic, const Trigger& trigger)
         : topic{topic}, trigger{trigger} {}
-        EStopPub(const YAML::Node& node) : YAMLParsable(node) {}
+        explicit EStopPub(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override {
             expect_not_null(node);
@@ -1271,10 +1276,10 @@ struct Action : YAMLParsable {
         std::string service = "~/trigger";
         Trigger trigger = 0;
 
-        TriggerClient() {}
+        TriggerClient() = default;
         TriggerClient(const std::string& service, const Trigger& trigger)
         : service{service}, trigger{trigger} {}
-        TriggerClient(const YAML::Node& node) : YAMLParsable(node) {}
+        explicit TriggerClient(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override {
             expect_not_null(node);
@@ -1301,7 +1306,7 @@ struct Action : YAMLParsable {
         FlippersPub,
         EStopPub,
         TriggerClient
-        > value;
+        > value{TwistPub()};
 
     static int index_from_type(std::string type) {
         if (type == "twist") { return 0; }
@@ -1332,12 +1337,12 @@ struct Action : YAMLParsable {
         return *this;
     }
 
-    Action() {}
+    Action() = default;
     Action(const TwistPub& _twist) : value{_twist} {}
     Action(const FlippersPub& _flippers) : value{_flippers} {}
     Action(const EStopPub& _estop) : value{_estop} {}
     Action(const TriggerClient& _trigger) : value{_trigger} {}
-    Action(const YAML::Node& node) : YAMLParsable(node) {}
+    explicit Action(const YAML::Node& node) { parse_from(node); }
 
 
     void parse_from(const YAML::Node& node) override {

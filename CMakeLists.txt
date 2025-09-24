@@ -6,19 +6,53 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 
+set(THIS_PROJECT_DEPEND
+  rclcpp
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+)
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
+find_package(yaml-cpp REQUIRED)
+foreach(dep IN ITEMS ${THIS_PROJECT_DEPEND})
+  find_package(${dep} REQUIRED)
+endforeach(dep)
 
 include_directories(include)
 
-add_executable(joy_controls src/joy_controls_node.cpp)
-ament_target_dependencies(joy_controls rclcpp std_msgs geometry_msgs sensor_msgs)
-target_compile_features(joy_controls PRIVATE cxx_std_20)
+# add_library(joy_controls_lib
+#   src/utils.cpp
+#   src/yaml.cpp
+# )
+# ament_target_dependencies(joy_controls_lib
+#   ${THIS_PROJECT_DEPEND}
+# )
+# target_compile_features(joy_controls_lib PRIVATE cxx_std_20)
 
+include_directories(${YAML_CPP_INCLUDE_DIR})
+add_executable(joy_controls src/joy_controls_node.cpp)
+ament_target_dependencies(joy_controls
+${THIS_PROJECT_DEPEND}
+)
+target_compile_features(joy_controls PRIVATE cxx_std_20)
+target_link_libraries(joy_controls yaml-cpp)
+# target_link_libraries(joy_controls joy_control_lib)
+
+# if (BUILD_TESTING)
+#   find_package(ament_cmake_gtest REQUIRED)
+#   ament_add_gtest(${PROJECT_NAME}_yaml_test test/yaml_test.cpp)
+#   target_include_directories(${PROJECT_NAME}_yaml_test PUBLIC
+#     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+#     $<INSTALL_INTERFACE:include>
+#   )
+#   target_compile_features(${PROJECT_NAME}_yaml_test PRIVATE cxx_std_20)
+#   ament_target_dependencies(${PROJECT_NAME}_yaml_test
+#     ${THIS_PROJECT_DEPEND}
+#   )
+#   target_link_libraries(${PROJECT_NAME}_yaml_test joy_control_lib)
+# endif()
 install(TARGETS
   joy_controls
   DESTINATION lib/${PROJECT_NAME}
