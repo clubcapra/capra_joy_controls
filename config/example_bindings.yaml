@@ -1,0 +1,140 @@
+legacy_controls: # Bindings name
+  rove_cmd_vel: # Control name
+    type: "twist_pub" # Control type
+    method: "teleop_twist_joy" # Control method
+    topic: "rove/cmd_vel"
+    axis_angular:
+      pitch: 0 # unassigned
+      roll: 0 # unassigned
+      yaw:
+        axis: 0
+    axis_linear:
+      x:
+        axis: 1 # LS_Y
+      y: 0 # unassigned
+      z: 0 # unassigned
+    enable_button:
+      button: 0
+    turbo_button: 0 # not set
+    scale_angular:
+      pitch: 0.0
+      roll: 0.0
+      yaw: 1.5
+    scale_angular_turbo:
+      pitch: 0.0
+      roll: 0.0
+      yaw: 2.0
+    scale_linear:
+      x: 1.5
+      y: 0.0
+      z: 0.0
+    scale_linear_turbo:
+      x: 2.0
+      y: 0.0
+      z: 0.0
+    publish_stamped_twist: true
+  
+  flippers: # Control name
+    type: "flippers_pub"
+    topic: "/rove/flippers"
+    presets:
+      flat: # Preset name
+        trigger:
+          axis_range:
+            id: 6 # DPAD_X
+            min: 0.5 # > 0.5 (up)
+          
+        positions:
+          front_left: 0.0
+          rear_left: 0.0
+          front_right: 0.0
+          rear_right: 0.0
+    
+    movements:
+      all: # Movement name
+        velocities:
+          front_left: 1
+          rear_left: 1.0
+          front_right: 1.0
+          rear_right: 1.0
+
+
+### Trigger:
+## Types:
+# On/Off or 0/1
+
+parent:
+  trig: 0
+  trig: 1
+
+# Button
+parent:
+  trig:
+    button: 5
+
+  trig:
+    button:
+      id: 5
+      event: "held"
+  
+  # Equivalent to
+  trig:
+    id: 5 # Joy button index            | Required
+    event: "held" # Activation state    | Optional (default:held) [options:held, on_press, on_release, not_held]
+
+# Axis range
+parent:
+  trig:
+    axis_range:
+      id: 5 # Joy axis index            | Required
+      event: "inside" # Activation state| Optional (default:inside) [options:inside, on_enter, on_exit, outside]
+      min: 0.5 # Minimum value          | Optional unless max not defined (default:undefined)
+      max: 1.0 # Maximum value          | Optional unless min not defined (default:undefined)
+
+# Conditional
+parent:
+  trig:
+    condition:
+      conditions: # List of triggers    | Required
+        - button: 5
+        - 0
+      while_true: 1 # Trigger           | Optional (default:1)
+      while_false: 0 # Trigger          | Optional (default:0)
+
+      # As mentioned earlier, this would also be valid
+      while_true:
+        axis_range:
+          id: 5
+          min: 0.5
+
+## Value
+# Constant
+parent:
+  value: 0.5
+
+  # Equivalent to
+  value:
+    constant: 0.5
+  
+# Axis
+parent:
+  value:
+    axis: 5 # Joy axis index
+
+  # Equivalent to
+  value:
+    axis:
+      id: 5 # Joy axis index              | Required
+      min: -1.0 # Axis minimum            | Optional (default:-1)
+      max: 1.0 # Axis maximum             | Optional (default:1)
+
+# Condition
+parent:
+  value:
+    condition:
+      conditions: # List of triggers      | Required
+        - button: 5
+      while_true: 1 # Value               | Optional (default:1)
+      while_false: 0 # Value              | Optional (default:0)
+
+
