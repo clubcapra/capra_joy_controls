@@ -8,7 +8,12 @@
 
 namespace capra_joy_controls {
 
+using btn_id = int;
+using axis_id = int;
 
+using Twist = geometry_msgs::msg::Twist;
+using Joy = sensor_msgs::msg::Joy;
+using Bool = std_msgs::msg::Bool;
 
 } // capra_joy_controls
 

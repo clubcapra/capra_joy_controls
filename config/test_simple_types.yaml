@@ -1,0 +1,48 @@
+trigger:
+  off_int: 0
+  on_int: 1
+  trig_fail: 2
+
+  button_short:
+    button: 2
+
+  button_long:
+    button:
+      id: 5
+    
+  button_full:
+    button:
+      id: 6
+      event: "on_release"
+
+  axis_range_half:
+    axis_range:
+      id: 4
+      min: 8.0
+      max: 2.0
+
+  axis_range_invalid:
+    axis_range:
+      id: 5
+
+  condition_simple:
+    condition:
+      conditions:
+        - 1
+
+  condition_recursive:
+    condition:
+      conditions:
+        - 1
+      while_true:
+        button: 0
+      while_false:
+        condition:
+          conditions:
+            - 1
+
+  condition_invalid:
+    condition:
+      while_true: 1
+      while_false: 0
+

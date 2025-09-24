@@ -1,0 +1,19 @@
+parent1:
+  float_scalar: 1.0
+  int_scalar: 4
+  bool_scalar: true
+  string_scalar: "hello"
+
+  sequence:
+    - 7
+    - nested_map:
+      value1: 1
+      value2: 2
+    
+  map:
+    value1: 1
+    value2: 2
+
+parent2:
+  value1: 1
+  value2: 2
