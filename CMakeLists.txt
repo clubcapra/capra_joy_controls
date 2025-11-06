@@ -26,6 +26,8 @@ add_library(joy_controls_lib
   src/parsable/Trigger.cpp
   src/parsable/Value.cpp
   src/parsable/Action.cpp
+  src/parsable/ControlScheme.cpp
+  src/parsable/SchemeMap.cpp
 )
 ament_target_dependencies(joy_controls_lib
   ${THIS_PROJECT_DEPEND}

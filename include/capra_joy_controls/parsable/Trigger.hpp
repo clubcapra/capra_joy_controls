@@ -7,6 +7,10 @@ namespace capra_joy_controls::parsable {
 
 struct Value;
 
+struct JoyTrigger {
+    virtual bool read(const JoyContext& context) = 0;
+};
+
 /**
  * @brief Trigger
  * @code {.yaml}
@@ -56,21 +60,23 @@ parent:
 * @endcode
 * 
 */
-struct Trigger : YAMLParsable {
+struct Trigger : YAMLParsable, JoyTrigger {
     // Always off
-    struct Off : YAMLParsable {
+    struct Off : YAMLParsable, JoyTrigger {
         Off() = default;
         explicit Off(const YAML::Node& node) { parse_from(node); }
         void parse_from(const YAML::Node& node) override { }
+        bool read(const JoyContext& context) override;
     };
     // Always on
-    struct On : YAMLParsable {
+    struct On : YAMLParsable, JoyTrigger {
         On() = default;
         explicit On(const YAML::Node& node) { parse_from(node); }
         void parse_from(const YAML::Node& node) override { }
+        bool read(const JoyContext& context) override;
     };
     // Button binding
-    struct Button : YAMLParsable {
+    struct Button : YAMLParsable, JoyTrigger {
         YAML_ENUM(ButtonEventType,
             held,
             on_press,
@@ -87,9 +93,10 @@ struct Trigger : YAMLParsable {
         explicit Button(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override;
+        bool read(const JoyContext& context) override;
     };
     // Axis range binding
-    struct AxisRange : YAMLParsable {
+    struct AxisRange : YAMLParsable, JoyTrigger {
         YAML_ENUM(AxisRangeEventType,
             inside,
             on_enter,
@@ -108,18 +115,29 @@ struct Trigger : YAMLParsable {
         explicit AxisRange(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override;
+        bool read(const JoyContext& context) override;
     };
     // Conditional trigger
-    struct Condition : YAMLParsable {
+    struct Condition : YAMLParsable, JoyTrigger {
+        YAML_ENUM(ConditionOperator,
+            _and,
+            _nand,
+            _or,
+            _nor,
+            _xor,
+            _nxor
+        )
         std::vector<Trigger> conditions = {};
+        ConditionOperator oper = ConditionOperator::_and;
         Trigger *while_true = nullptr;
         Trigger *while_false = nullptr;
 
         Condition() = default;
-        Condition(const std::vector<Trigger>& conditions, const Trigger& while_true = Trigger::On(), const Trigger& while_false = Trigger::Off()) 
+        Condition(const std::vector<Trigger>& conditions, const ConditionOperator& oper = ConditionOperator::_and, const Trigger& while_true = Trigger::On(), const Trigger& while_false = Trigger::Off()) 
         : conditions(conditions), while_true(new Trigger(while_true)), while_false(new Trigger(while_false)) {}
         Condition(const Condition& other) {
             conditions = other.conditions;
+            oper = other.oper;
             if (other.while_true) {
                 while_true = new Trigger(*other.while_true);
             }
@@ -133,6 +151,7 @@ struct Trigger : YAMLParsable {
         void set_while_false(Trigger* trigger);
 
         void parse_from(const YAML::Node& node) override;
+        bool read(const JoyContext& context) override;
     
         ~Condition() {
             if (while_true) {
@@ -180,8 +199,8 @@ struct Trigger : YAMLParsable {
     static Trigger create_axis_range(const axis_id& id, const AxisRange::AxisRangeEventType& event = AxisRange::inside, const float& min = NAN, const float& max = NAN)
     { return create_axis_range(AxisRange(id, event, min, max)); }
     static Trigger create_condition(const Condition& condition) { return {condition}; }
-    static Trigger create_condition(const std::vector<Trigger>& conditions, const Trigger& while_true = On(), const Trigger& while_false = Off())
-    { return create_condition(Condition{conditions, while_true, while_false}); }
+    static Trigger create_condition(const std::vector<Trigger>& conditions, const Condition::ConditionOperator& oper = Condition::ConditionOperator::_and, const Trigger& while_true = On(), const Trigger& while_false = Off())
+    { return create_condition(Condition{conditions, oper, while_true, while_false}); }
 
     // Assignement operators
     Trigger& operator=(const bool& state) {
@@ -224,6 +243,7 @@ struct Trigger : YAMLParsable {
     explicit Trigger(const YAML::Node& node) { parse_from(node); }
 
     void parse_from(const YAML::Node& node) override;
+    bool read(const JoyContext& context) override;
 };
 
 } // capra_joy_controls::parsable

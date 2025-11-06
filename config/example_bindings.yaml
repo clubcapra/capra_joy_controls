@@ -1,140 +1,311 @@
 legacy_controls: # Bindings name
-  rove_cmd_vel: # Control name
-    type: "twist_pub" # Control type
-    method: "teleop_twist_joy" # Control method
-    topic: "rove/cmd_vel"
-    axis_angular:
-      pitch: 0 # unassigned
-      roll: 0 # unassigned
-      yaw:
-        axis: 0
-    axis_linear:
-      x:
-        axis: 1 # LS_Y
-      y: 0 # unassigned
-      z: 0 # unassigned
+  rove_cmd_vel: # Action name
+    type: "twist_pub" # Action type
+
+    topic: "/rove/cmd_vel"
     enable_button:
       button: 0
-    turbo_button: 0 # not set
-    scale_angular:
-      pitch: 0.0
-      roll: 0.0
-      yaw: 1.5
-    scale_angular_turbo:
-      pitch: 0.0
-      roll: 0.0
-      yaw: 2.0
-    scale_linear:
-      x: 1.5
-      y: 0.0
-      z: 0.0
-    scale_linear_turbo:
-      x: 2.0
-      y: 0.0
-      z: 0.0
     publish_stamped_twist: true
+    turbo_button: 0 # not set
+
+    teleop_twist_joy: # Control method
+      axis_angular:
+        pitch: 0 # unassigned
+        roll: 0 # unassigned
+        yaw:
+          axis: 0
+      axis_linear:
+        x:
+          axis: 1 # LS_Y
+        y: 0 # unassigned
+        z: 0 # unassigned
+      scale_angular:
+        pitch: 0.0
+        roll: 0.0
+        yaw: 1.5
+      scale_angular_turbo:
+        pitch: 0.0
+        roll: 0.0
+        yaw: 2.0
+      scale_linear:
+        x: 1.5
+        y: 0.0
+        z: 0.0
+      scale_linear_turbo:
+        x: 2.0
+        y: 0.0
+        z: 0.0
   
   flippers: # Control name
     type: "flippers_pub"
     topic: "/rove/flippers"
-    presets:
-      flat: # Preset name
-        trigger:
-          axis_range:
-            id: 6 # DPAD_X
-            min: 0.5 # > 0.5 (up)
+    enable:
+      button: 0 # A
+    # presets:
+    #   flat: # Preset name
+    #     trigger:
+    #       axis_range:
+    #         id: 6 # DPAD_X
+    #         min: 0.5 # > 0.5 (up)
           
-        positions:
-          front_left: 0.0
-          rear_left: 0.0
-          front_right: 0.0
-          rear_right: 0.0
+    #     positions:
+    #       front_left: 0.0
+    #       rear_left: 0.0
+    #       front_right: 0.0
+    #       rear_right: 0.0
     
     movements:
-      all: # Movement name
-        velocities:
-          front_left: 1
-          rear_left: 1.0
-          front_right: 1.0
-          rear_right: 1.0
-
-
-### Trigger:
-## Types:
-# On/Off or 0/1
-
-parent:
-  trig: 0
-  trig: 1
-
-# Button
-parent:
-  trig:
-    button: 5
-
-  trig:
-    button:
-      id: 5
-      event: "held"
+      front_left:
+        condition:
+          operator: "or"
+          conditions:
+            - button: 4 # LB
+            - condition: # Not holding any bumpers or triggers
+                operator: "nor"
+                conditions:
+                  - button: 4 # LB
+                  - button: 5 # RB
+                  - axis_range:
+                      id: 2 # LT
+                      min: 0.5
+                  - axis_range:
+                      id:  5 # RT
+                      min: 0.5
+        while_true:
+          axis: 7 # D_PAD_Y
   
-  # Equivalent to
-  trig:
-    id: 5 # Joy button index            | Required
-    event: "held" # Activation state    | Optional (default:held) [options:held, on_press, on_release, not_held]
+      rear_left:
+        condition:
+          operator: "or"
+          conditions:
+            - axis_range:
+                id: 2 # LT
+                min: 0.5
+            - condition: # Not holding any bumpers or triggers
+                operator: "nor"
+                conditions:
+                  - button: 4 # LB
+                  - button: 5 # RB
+                  - axis_range:
+                      id: 2 # LT
+                      min: 0.5
+                  - axis_range:
+                      id: 5 # RT
+                      min: 0.5
+        while_true:
+          axis: 7 # D_PAD_Y
+      front_right:
+        condition:
+          operator: "or"
+          conditions:
+            - axis_range:
+                id: 5 # RT
+                min: 0.5
+            - condition: # Not holding any bumpers or triggers
+                operator: "nor"
+                conditions:
+                  - button: 4 # LB
+                  - button: 5 # RB
+                  - axis_range:
+                      id: 2 # LT
+                      min: 0.5
+                  - axis_range:
+                      id: 5 # RT
+                      min: 0.5
+        while_true:
+          axis: 7 # D_PAD_Y
+      rear_right:
+        condition:
+          operator: "or"
+          conditions:
+            - button: 5 # RB
+            - condition: # Not holding any bumpers or triggers
+                operator: "nor"
+                conditions:
+                  - button: 4 # LB
+                  - button: 5 # RB
+                  - axis_range:
+                      id: 2 # LT
+                      min: 0.5
+                  - axis_range:
+                      id:  5 # RT
+                      min: 0.5
+        while_true:
+          axis: 7 # D_PAD_Y
+  estop:
+    type: "estop_pub"
+    topic: "/rove/estop"
+    latch:
+      condition:
+        operator: "or"
+        conditions:
+          - button: 8 # XBox button
+          - button: 12 # LB4 (steamdeck)
+          - button: 14 # RB4 (steamdeck)
+    unlatch:
+      button: 1 # B
 
-# Axis range
-parent:
-  trig:
-    axis_range:
-      id: 5 # Joy axis index            | Required
-      event: "inside" # Activation state| Optional (default:inside) [options:inside, on_enter, on_exit, outside]
-      min: 0.5 # Minimum value          | Optional unless max not defined (default:undefined)
-      max: 1.0 # Maximum value          | Optional unless min not defined (default:undefined)
+tank_controls:
+  tank_control:
+    type: "twist_pub"
 
-# Conditional
-parent:
-  trig:
-    condition:
-      conditions: # List of triggers    | Required
-        - button: 5
-        - 0
-      while_true: 1 # Trigger           | Optional (default:1)
-      while_false: 0 # Trigger          | Optional (default:0)
+    topic: "/rove/cmd_vel"
+    enable_button:
+      button: 4 # LB
+    publish_stamped_twist: true
+    turbo_button: 0 # not set
 
-      # As mentioned earlier, this would also be valid
-      while_true:
-        axis_range:
-          id: 5
-          min: 0.5
+    tank_joy:
+      left:
+        axis: 1 # LS_Y
+      right:
+        axis: 4 # RS_Y
+      scale: 1
+      scale_turbo: 2
+    
+  flippers:
+    type: "flippers_pub"
 
-## Value
-# Constant
-parent:
-  value: 0.5
+    topic: "/rove/flippers"
+    enable:
+      button: 5 # RB
+    
+    presets:
+      flat:
+        trigger:
+          axis_range:
+            id: 6 # D_PAD_X
+            max: -0.5 # LEFT
+        positions:
+          front_left: 0
+          front_right: 0
+          rear_left: 0
+          rear_right: 0
+    movements:
+      # RB + LS_Y = move all
+      # RB + Y + LS_Y = move front
+      # RB + A + LS_Y = move back
+      front_left:
+        condition:
+          operator: "nand"
+          conditions:
+            - button: 0 # A
+          while_true:
+            axis: 1 # LS_Y
+      front_right:
+        condition:
+          operator: "nand"
+          conditions:
+            - button: 0 # A
+          while_true:
+            axis: 1 # LS_Y
 
-  # Equivalent to
-  value:
-    constant: 0.5
+      rear_left:
+        condition:
+          operator: "nand"
+          conditions:
+            - button: 3 # Y
+          while_true:
+            axis: 1 # LS_Y
+      rear_right:
+        condition:
+          operator: "nand"
+          conditions:
+            - button: 3 # Y
+          while_true:
+            axis: 1 # LS_Y
+
+  estop:
+    type: "estop_pub"
+    topic: "/rove/estop"
+    latch:
+      condition:
+        operator: "or"
+        conditions:
+          - button: 8 # XBox button
+          - button: 12 # LB4 (steamdeck)
+          - button: 14 # LB4 (steamdeck)
+    unlatch:
+      button: 1 # B
+
+
+
+# ### Trigger:
+# ## Types:
+# # On/Off or 0/1
+
+# parent:
+#   trig: 0
+#   trig: 1
+
+# # Button
+# parent:
+#   trig:
+#     button: 5
+
+#   trig:
+#     button:
+#       id: 5
+#       event: "held"
   
-# Axis
-parent:
-  value:
-    axis: 5 # Joy axis index
+#   # Equivalent to
+#   trig:
+#     id: 5 # Joy button index            | Required
+#     event: "held" # Activation state    | Optional (default:held) [options:held, on_press, on_release, not_held]
 
-  # Equivalent to
-  value:
-    axis:
-      id: 5 # Joy axis index              | Required
-      min: -1.0 # Axis minimum            | Optional (default:-1)
-      max: 1.0 # Axis maximum             | Optional (default:1)
+# # Axis range
+# parent:
+#   trig:
+#     axis_range:
+#       id: 5 # Joy axis index            | Required
+#       event: "inside" # Activation state| Optional (default:inside) [options:inside, on_enter, on_exit, outside]
+#       min: 0.5 # Minimum value          | Optional unless max not defined (default:undefined)
+#       max: 1.0 # Maximum value          | Optional unless min not defined (default:undefined)
 
-# Condition
-parent:
-  value:
-    condition:
-      conditions: # List of triggers      | Required
-        - button: 5
-      while_true: 1 # Value               | Optional (default:1)
-      while_false: 0 # Value              | Optional (default:0)
+# # Conditional
+# parent:
+#   trig:
+#     condition:
+#       conditions: # List of triggers    | Required
+#         - button: 5
+#         - 0
+#       while_true: 1 # Trigger           | Optional (default:1)
+#       while_false: 0 # Trigger          | Optional (default:0)
+
+#       # As mentioned earlier, this would also be valid
+#       while_true:
+#         axis_range:
+#           id: 5
+#           min: 0.5
+
+# ## Value
+# # Constant
+# parent:
+#   value: 0.5
+
+#   # Equivalent to
+#   value:
+#     constant: 0.5
+  
+# # Axis
+# parent:
+#   value:
+#     axis: 5 # Joy axis index
+
+#   # Equivalent to
+#   value:
+#     axis:
+#       id: 5 # Joy axis index              | Required
+#       min: -1.0 # Axis minimum            | Optional (default:-1)
+#       max: 1.0 # Axis maximum             | Optional (default:1)
+
+# # Condition
+# parent:
+#   value:
+#     condition:
+#       conditions: # List of triggers      | Required
+#         - button: 5
+#       while_true: 1 # Value               | Optional (default:1)
+#       while_false: 0 # Value              | Optional (default:0)
           
 

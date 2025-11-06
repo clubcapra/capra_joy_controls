@@ -59,8 +59,6 @@ public:
             rclcpp::NodeOptions().allow_undeclared_parameters(
             true).automatically_declare_parameters_from_overrides(true))
     {
-
-
         // Create subcriptions
         joySub_ = this->create_subscription<Joy>(
             "joy", 1, std::bind(&JoyControlsNode::joy_cb, this, std::placeholders::_1));
@@ -74,7 +72,65 @@ public:
     }
 
 private:
+    // Converts the yaml parameters from ros into a more convienient YAML::Node to allow easy parsing
+    YAML::Node get_yaml()
+    {
+        YAML::Node root;
+
+        // Get all parameter names
+        auto parameters = this->list_parameters({}, rcl_interfaces::srv::ListParameters::Request::DEPTH_RECURSIVE);
+
+        for (const auto & name : parameters.names) {
+            // Retrieve the parameter
+            rclcpp::Parameter param = this->get_parameter(name);
+
+            // Build nested YAML structure for dot-separated names (e.g. "axes.linear")
+            YAML::Node *current = &root;
+            std::stringstream ss(name);
+            std::string token;
+
+            while (std::getline(ss, token, '.')) {
+                // current = &((*current)[token]);
+            }
+
+            // Assign value according to type
+            switch (param.get_type()) {
+                case rclcpp::ParameterType::PARAMETER_BOOL:
+                    *current = param.as_bool();
+                    break;
+                case rclcpp::ParameterType::PARAMETER_INTEGER:
+                    *current = param.as_int();
+                    break;
+                case rclcpp::ParameterType::PARAMETER_DOUBLE:
+                    *current = param.as_double();
+                    break;
+                case rclcpp::ParameterType::PARAMETER_STRING:
+                    *current = param.as_string();
+                    break;
+                case rclcpp::ParameterType::PARAMETER_BOOL_ARRAY:
+                    *current = param.as_bool_array();
+                    break;
+                case rclcpp::ParameterType::PARAMETER_INTEGER_ARRAY:
+                    *current = param.as_integer_array();
+                    break;
+                case rclcpp::ParameterType::PARAMETER_DOUBLE_ARRAY:
+                    *current = param.as_double_array();
+                    break;
+                case rclcpp::ParameterType::PARAMETER_STRING_ARRAY:
+                    *current = param.as_string_array();
+                    break;
+                default:
+                    RCLCPP_WARN(this->get_logger(), "Unsupported parameter type for '%s'", name.c_str());
+                    break;
+            }
+        }
+
+        return root;
+    }
+
     void parse_params() {
+        auto params = get_yaml();
+        map_.parse_from(params);
     }
 
     void joy_cb(Joy::SharedPtr joy)
@@ -83,7 +139,6 @@ private:
 
 
 
-    bool enable_;
     bool estop_;
     float spacing_;
     float turnMultiplier_;
@@ -95,6 +150,9 @@ private:
     rclcpp::Publisher<Bool>::SharedPtr estopPub_;
 
     std::vector<Action> actions_;
+    
+    // Parameters
+    SchemeMap map_;
 };
 } // namespace capra_joy_controls
 

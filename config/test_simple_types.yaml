@@ -34,8 +34,49 @@ trigger:
     condition:
       conditions:
         - 1
+      operator: "nor"
       while_true:
         button: 0
+      while_false:
+        condition:
+          conditions:
+            - 1
+
+  condition_invalid:
+    condition:
+      while_true: 1
+      while_false: 0
+
+value:
+  constant_int: 0
+  constant_float: 0.5
+  constant_long:
+    constant: 5.0
+
+  axis_short:
+    axis: 0
+
+  axis_long:
+    axis:
+      id: 6
+
+  axis_full:
+    axis:
+      id: 8
+      min: 1
+      max: -1
+
+  condition_simple:
+    condition:
+      conditions:
+        - 1
+
+  condition_recursive:
+    condition:
+      conditions:
+        - 1
+      while_true:
+        axis: 0
       while_false:
         condition:
           conditions:

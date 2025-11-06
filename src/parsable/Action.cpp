@@ -76,15 +76,6 @@ void Action::TwistPub::Tank::parse_from(const YAML::Node &node)
     if (auto nscale_turbo = node["scale_turbo"]) {
         scale_turbo = Value(nscale_turbo);
     }
-    if (auto nwheel_separation = node["wheel_separation"]) {
-        wheel_separation = Value(nwheel_separation);
-    }
-    if (auto nturn_multiplier = node["turn_multiplier"]) {
-        turn_multiplier = Value(nturn_multiplier);
-    }
-    if (auto nwheel_radius = node["wheel_radius"]) {
-        wheel_radius = Value(nwheel_radius);
-    }
 }
 
 void Action::TwistPub::parse_from(const YAML::Node &node)
@@ -164,44 +155,36 @@ void Action::FlippersPub::Preset::parse_from(const YAML::Node &node)
     positions = Flippers(npositions);
 }
 
-void Action::FlippersPub::Movement::parse_from(const YAML::Node &node)
-{
-    expect_not_null(node);
-    expect_defined(node);
-    expect_node_type(node, YAML::NodeType::Map);
-
-    name = node.Tag();
-    auto nvelocities = node["velocities"];
-    expect_defined(nvelocities); // Required
-    velocities = Flippers(nvelocities);
-}
-
 void Action::FlippersPub::parse_from(const YAML::Node &node)
 {
     expect_not_null(node);
     expect_defined(node);
     expect_node_type(node, YAML::NodeType::Map);
 
+    auto nenable = node["enable"];
+    expect_defined(nenable); // Required
+    enable = Trigger(nenable);
+
     if (auto ntopic = node["topic"]) {
         topic = parse_value<std::string>(ntopic);
     }
 
-    auto npresets = node["presets"];
-    expect_defined(npresets);
-    expect_node_type(npresets, YAML::NodeType::Sequence);
-    for (auto npreset : npresets) {
-        presets.push_back(Preset(npreset));
-    }
-    if (presets.size() == 0) {
-        THROW(YAMLParseException, npresets, "At least one preset is required");
+    if (auto npresets = node["presets"]) {
+        expect_node_type(npresets, YAML::NodeType::Map);
+        for (auto npreset : npresets) {
+            auto p = npreset.second;
+            p.SetTag(npreset.first.Scalar());
+            presets.push_back(Preset(p));
+        }
+        if (presets.size() == 0) {
+            THROW(YAMLParseException, npresets, "At least one preset is required");
+        }
     }
 
-    auto nmovements = node["movements"];
-    expect_defined(nmovements);
-    expect_node_type(nmovements, YAML::NodeType::Sequence);
-    for (auto nmovement : nmovements) {
-        movements.push_back(Movement(nmovement));
+    if (auto nmovements = node["movements"]){
+        movements = Flippers(nmovements);
     }
+    
 }
 
 void Action::EStopPub::parse_from(const YAML::Node &node)
@@ -214,9 +197,13 @@ void Action::EStopPub::parse_from(const YAML::Node &node)
         topic = parse_value<std::string>(ntopic);
     }
 
-    auto ntrigger = node["trigger"];
-    expect_defined(ntrigger); // Required
-    trigger = Trigger(ntrigger);
+    auto nlatch = node["latch"];
+    expect_defined(nlatch); // Required
+    latch = Trigger(nlatch);
+
+    auto nunlatch = node["unlatch"];
+    expect_defined(nunlatch); // Required
+    unlatch = Trigger(nunlatch);
 }
 
 void Action::TriggerClient::parse_from(const YAML::Node & node)

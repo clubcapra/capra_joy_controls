@@ -11,10 +11,22 @@ void Value::Constant::parse_from(const YAML::Node &node)
     value = parse_value<float>(node);
 }
 
+float Value::Constant::read(const JoyContext &context)
+{
+    return value;
+}
+
 void Value::Axis::parse_from(const YAML::Node &node)
 {
     expect_not_null(node);
     expect_defined(node);
+    expect_node_type(node, {YAML::NodeType::Map, YAML::NodeType::Scalar});
+
+    // Abridged version
+    if (node.Type() == YAML::NodeType::Scalar) {
+        id = parse_value<int>(node);
+        return;
+    }
     
     auto nid = node["id"];
     expect_defined(nid); // Required
@@ -27,6 +39,11 @@ void Value::Axis::parse_from(const YAML::Node &node)
     if (auto nmax = node["max"]) { // Optional
         max = parse_value<float>(nmax);
     }
+}
+
+float Value::Axis::read(const JoyContext &context)
+{
+    return context.axis(id);
 }
 
 void Value::Condition::set_while_true(Value *value)
@@ -69,6 +86,11 @@ void Value::Condition::parse_from(const YAML::Node& node)
         THROW(YAMLParseException, node, "At least one condition is required");
     }
 
+    if (auto noper = node["operator"]) {
+        expect_node_type(noper, YAML::NodeType::Scalar);
+        oper = parse_enum_ConditionOperator(noper, "_" + noper.Scalar());
+    }
+
     if (auto nwhile_true = node["while_true"]) {
         set_while_true(new Value(nwhile_true));
     }
@@ -77,6 +99,55 @@ void Value::Condition::parse_from(const YAML::Node& node)
         set_while_false(new Value(nwhile_false));
     }
 }
+
+float Value::Condition::read(const JoyContext& context)
+{
+    auto eval = [&](){
+        switch (oper)
+        {
+        case ConditionOperator::_and:
+            for (auto t : conditions) {
+                if (!t.read(context)) return false;
+            }
+            return true;
+        case ConditionOperator::_nand:
+            for (auto t : conditions) {
+                if (!t.read(context)) return true;
+            }
+            return false;
+        case ConditionOperator::_or:
+            for (auto t : conditions) {
+                if (t.read(context)) return true;
+            }
+            return false;
+        case ConditionOperator::_nor:
+            for (auto t : conditions) {
+                if (t.read(context)) return false;
+            }
+            return true;
+        case ConditionOperator::_xor:
+            {
+                int count = 0;
+                for (auto t : conditions) {
+                    if (t.read(context)) ++count;
+                }
+                return count == 1;
+            }
+        case ConditionOperator::_nxor:
+            {
+                int count = 0;
+                for (auto t : conditions) {
+                    if (t.read(context)) ++count;
+                }
+                return count != 1;
+            }
+        default:
+            return false;
+        }
+    };
+    return eval() ? (while_true && while_true->read(context)) : (while_false && while_false->read(context));
+}
+
 
 void Value::parse_from(const YAML::Node &node)
 {
@@ -112,4 +183,18 @@ void Value::parse_from(const YAML::Node &node)
     }
 }
 
+float Value::read(const JoyContext &context)
+{
+    switch (type())
+    {
+    case ValueType::constant:
+        return get_constant()->read(context);
+    case ValueType::axis:
+        return get_axis()->read(context);
+    case ValueType::condition:
+        return get_condition()->read(context);
+    default:
+        return 0.f;
+    }
+}
 }

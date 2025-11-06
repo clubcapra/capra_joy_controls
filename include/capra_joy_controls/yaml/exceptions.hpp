@@ -86,11 +86,24 @@ public:
         const std::vector<std::string>& allowedValues, 
         const std::runtime_error* inner = nullptr) 
     : YAMLParseException(file, line, node,
-        "Invalid enum value '" + entry +
+        "Invalid enum value '" + strip(entry) +
         "' for enum '" + typeid(TEnum).name() +
-        "'. Allowed values: " + join(allowedValues, ", "),
+        "'. Allowed values: " + join(strip(allowedValues), ", "),
         inner
     ) {}
+
+private:
+    std::string strip(const std::string& val) {
+        return val.starts_with('_') ? val.substr(1) : val;
+    }
+
+    std::vector<std::string> strip(const std::vector<std::string>& val) {
+        std::vector<std::string> res{};
+        for (auto v : val) {
+            res.emplace_back(strip(v));
+        }
+        return res;
+    }
 };
 
 class YAMLInvalidNodeType : public YAMLParseException {

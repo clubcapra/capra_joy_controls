@@ -42,7 +42,6 @@ inline TValue parse_value(const YAML::Node& node) {
 
 template <typename TEnum>
 inline TEnum parse_any_enum(const YAML::Node& node, const std::string& value, const std::vector<std::string>& values) {
-    
     for (int i = 0; i < values.size(); ++i) {
         if (value == values[i]) {
             return (TEnum)i;

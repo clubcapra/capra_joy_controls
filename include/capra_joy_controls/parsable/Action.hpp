@@ -60,27 +60,18 @@ struct Action : YAMLParsable {
             Value left = 0, right = 0;
             Value scale = 1;
             Value scale_turbo = 1;
-            Value wheel_separation = 0;
-            Value turn_multiplier = 0;
-            Value wheel_radius = 0;
 
             Tank() = default;
             Tank(
                 const Value& left,
                 const Value& right,
                 const Value& scale = 1,
-                const Value& scale_turbo = 1,
-                const Value& wheel_separation = 0,
-                const Value& turn_multiplier = 0,
-                const Value& wheel_radius = 0
+                const Value& scale_turbo = 1
             ) :
                 left{left},
                 right{right},
                 scale{scale},
-                scale_turbo{scale_turbo},
-                wheel_separation{wheel_separation},
-                turn_multiplier{turn_multiplier},
-                wheel_radius{wheel_radius}
+                scale_turbo{scale_turbo}
             {}
 
             explicit Tank(const YAML::Node& node) { parse_from(node); }
@@ -205,25 +196,15 @@ struct Action : YAMLParsable {
             explicit Preset(const YAML::Node& node) { parse_from(node); }
             void parse_from(const YAML::Node& node) override;
         };
-        struct Movement : YAMLParsable {
-            std::string name = "";
-            Flippers velocities{};
-
-            Movement() = default;
-            Movement(const std::string& name, const Flippers& velocities = {})
-            : name{name}, velocities{velocities} {}
-            explicit Movement(const YAML::Node& node) { parse_from(node); }
-
-            void parse_from(const YAML::Node& node) override;
-        };
 
         // Fields
         std::string topic = "~/flippers";
+        Trigger enable{};
         std::vector<Preset> presets{};
-        std::vector<Movement> movements{};
+        Flippers movements{};
 
         FlippersPub() = default;
-        FlippersPub(const std::string& topic, const std::vector<Preset>& presets = {}, const std::vector<Movement>& movements = {})
+        FlippersPub(const std::string& topic, const Trigger& enable = {}, const std::vector<Preset>& presets = {}, const Flippers& movements = {})
         : topic{topic}, presets{presets}, movements{movements} {}
         explicit FlippersPub(const YAML::Node& node) { parse_from(node); }
 
@@ -233,11 +214,12 @@ struct Action : YAMLParsable {
     // EStop publisher
     struct EStopPub : YAMLParsable {
         std::string topic = "~/estop";
-        Trigger trigger = 0;
+        Trigger latch = 0;
+        Trigger unlatch = 0;
 
         EStopPub() = default;
-        EStopPub(const std::string& topic, const Trigger& trigger)
-        : topic{topic}, trigger{trigger} {}
+        EStopPub(const std::string& topic, const Trigger& latch, const Trigger& unlatch)
+        : topic{topic}, latch{latch}, unlatch{unlatch} {}
         explicit EStopPub(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override;

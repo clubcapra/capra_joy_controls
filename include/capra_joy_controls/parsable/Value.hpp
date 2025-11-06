@@ -7,6 +7,10 @@ namespace capra_joy_controls::parsable {
 
 struct Trigger;
 
+struct JoyValue {
+    virtual float read(const JoyContext& context) = 0;
+};
+
 /**
  * @brief Value
  * @code {.yaml}
@@ -38,6 +42,7 @@ parent:
         condition:
         conditions: # List of triggers      | Required
             - button: 5
+        operator: "and" # Operator          | Optional (default:and) [options:and, nand, or, nor, xor, nxor]
         while_true: 1 # Value               | Optional (default:1)
         while_false: 0 # Value              | Optional (default:0)
 ```
@@ -45,17 +50,18 @@ parent:
  * 
  * 
  */
-struct Value : YAMLParsable {
+struct Value : YAMLParsable, JoyValue {
     // Constant value
-    struct Constant : YAMLParsable {
+    struct Constant : YAMLParsable, JoyValue {
         float value = 0;
 
         Constant() = default;
         Constant(const float& value) : value{value} {}
         explicit Constant(const YAML::Node& node) { parse_from(node); }
         void parse_from(const YAML::Node& node) override;
+        float read(const JoyContext& context) override;
     };
-    struct Axis : YAMLParsable{
+    struct Axis : YAMLParsable, JoyValue {
         axis_id id = -1;
         float min = NAN;
         float max = NAN;
@@ -65,18 +71,29 @@ struct Value : YAMLParsable {
         explicit Axis(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override;
+        float read(const JoyContext& context) override;
     };
-    struct Condition : YAMLParsable {
+    struct Condition : YAMLParsable, JoyValue {
+        YAML_ENUM(ConditionOperator,
+            _and,
+            _nand,
+            _or,
+            _nor,
+            _xor,
+            _nxor
+        )
         std::vector<Trigger> conditions = {};
+        ConditionOperator oper = ConditionOperator::_and;
         Value* while_true = nullptr;
         Value* while_false = nullptr;
 
         Condition() = default;
-        Condition(const std::vector<Trigger>& conditions, const Value& while_true = Value::Constant(1), const Value& while_false = Value::Constant(0)) 
-        : conditions(conditions), while_true(new Value(while_true)), while_false(new Value(while_false)) {}
+        Condition(const std::vector<Trigger>& conditions, const ConditionOperator& oper = ConditionOperator::_and, const Value& while_true = Value::Constant(1), const Value& while_false = Value::Constant(0)) 
+        : conditions(conditions), oper(oper), while_true(new Value(while_true)), while_false(new Value(while_false)) {}
     
         Condition(const Condition& other) {
             conditions = other.conditions;
+            oper = other.oper;
             if (other.while_true) {
                 while_true = new Value(*other.while_true);
             }
@@ -90,6 +107,7 @@ struct Value : YAMLParsable {
         void set_while_false(Value* value);
 
         void parse_from(const YAML::Node& node) override;
+        float read(const JoyContext& context) override;
     
         ~Condition() {
             if (while_true) {
@@ -128,8 +146,8 @@ struct Value : YAMLParsable {
     static Value create_axis(const Axis& _axis) { return {_axis}; }
     static Value create_axis(const axis_id& id = -1, const float& min = NAN, const float& max = NAN) { return create_axis(id, min, max); }
     static Value create_condition(const Condition& _condition) { return {_condition}; }
-    static Value create_condition(const std::vector<Trigger>& conditions, const Value& while_true = create_constant(1), const Value& while_false = create_constant(0)) 
-    { return create_condition(Condition(conditions, while_true, while_false)); }
+    static Value create_condition(const std::vector<Trigger>& conditions, const Condition::ConditionOperator& oper = Condition::ConditionOperator::_and, const Value& while_true = create_constant(1), const Value& while_false = create_constant(0)) 
+    { return create_condition(Condition(conditions, oper, while_true, while_false)); }
 
     // Assignement methods
     Value& operator=(const Constant& _constant) {
@@ -154,6 +172,7 @@ struct Value : YAMLParsable {
     explicit Value(const YAML::Node& node) { parse_from(node); }
 
     void parse_from(const YAML::Node& node) override;
+    float read(const JoyContext& context) override;
 };
 
 } // capra_joy_controls::parsable

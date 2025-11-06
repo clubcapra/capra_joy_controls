@@ -3,6 +3,16 @@
 
 namespace capra_joy_controls::parsable {
 
+bool Trigger::Off::read(const JoyContext &context)
+{
+    return false;
+}
+
+bool Trigger::On::read(const JoyContext &context)
+{
+    return true;
+}
+
 void Trigger::Button::parse_from(const YAML::Node &node)
 {
     expect_not_null(node);
@@ -34,6 +44,23 @@ void Trigger::Button::parse_from(const YAML::Node &node)
     }
 }
 
+bool Trigger::Button::read(const JoyContext &context)
+{
+    switch (event)
+    {
+    case ButtonEventType::held:
+        return context.button(id);
+    case ButtonEventType::not_held:
+        return !context.button(id);
+    case ButtonEventType::on_press:
+        return context.rising(id);
+    case ButtonEventType::on_release:
+        return context.falling(id);
+    default:
+        return false;
+    }
+}
+
 void Trigger::AxisRange::parse_from(const YAML::Node &node)
 {
     expect_not_null(node);
@@ -62,6 +89,23 @@ void Trigger::AxisRange::parse_from(const YAML::Node &node)
     }
     if (std::isnan(min) && std::isnan(max)) {
         THROW(YAMLParseException, node, "At least 'min' or 'max' need to be specified for axis_range");
+    }
+}
+
+bool Trigger::AxisRange::read(const JoyContext &context)
+{
+    switch (event)
+    {
+    case AxisRangeEventType::inside:
+        return context.inside(id, min, max);
+    case AxisRangeEventType::outside:
+        return !context.inside(id, min, max);
+    case AxisRangeEventType::on_enter:
+        return context.entered(id, min, max);
+    case AxisRangeEventType::on_exit:
+        return context.exited(id, min, max);
+    default:
+        return 0.f;
     }
 }
 
@@ -105,6 +149,11 @@ void Trigger::Condition::parse_from(const YAML::Node &node)
         THROW(YAMLParseException, node, "At least one condition is required");
     }
 
+    if (auto noper = node["operator"]) {
+        expect_node_type(noper, YAML::NodeType::Scalar);
+        oper = parse_enum_ConditionOperator(noper, "_" + noper.Scalar());
+    }
+
     if (auto nwhile_true = node["while_true"]) {
         set_while_true(new Trigger(nwhile_true));
     }
@@ -113,6 +162,55 @@ void Trigger::Condition::parse_from(const YAML::Node &node)
         set_while_false(new Trigger(nwhile_false));
     }
 }
+
+bool Trigger::Condition::read(const JoyContext &context)
+{
+    auto eval = [&](){
+        switch (oper)
+        {
+        case ConditionOperator::_and:
+            for (auto t : conditions) {
+                if (!t.read(context)) return false;
+            }
+            return true;
+        case ConditionOperator::_nand:
+            for (auto t : conditions) {
+                if (!t.read(context)) return true;
+            }
+            return false;
+        case ConditionOperator::_or:
+            for (auto t : conditions) {
+                if (t.read(context)) return true;
+            }
+            return false;
+        case ConditionOperator::_nor:
+            for (auto t : conditions) {
+                if (t.read(context)) return false;
+            }
+            return true;
+        case ConditionOperator::_xor:
+            {
+                int count = 0;
+                for (auto t : conditions) {
+                    if (t.read(context)) ++count;
+                }
+                return count == 1;
+            }
+        case ConditionOperator::_nxor:
+            {
+                int count = 0;
+                for (auto t : conditions) {
+                    if (t.read(context)) ++count;
+                }
+                return count != 1;
+            }
+        default:
+            return false;
+        }
+    };
+    return eval() ? (while_true && while_true->read(context)) : (while_false && while_false->read(context));
+}
+
 void Trigger::parse_from(const YAML::Node &node)
 {
     expect_defined(node);
@@ -157,4 +255,25 @@ void Trigger::parse_from(const YAML::Node &node)
     }
     
 }
+
+bool Trigger::read(const JoyContext &context)
+{
+    switch (type()) {
+        case TriggerType::button:
+            return get_button()->read(context);
+        case TriggerType::axis_range:
+            return get_axis_range()->read(context);
+        case TriggerType::condition:
+            return get_condition()->read(context);
+        case TriggerType::on:
+            return get_on()->read(context);
+        case TriggerType::off:
+            return get_off()->read(context);
+        default:
+            return false;
+    }
+}
+
+
+
 }
