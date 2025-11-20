@@ -5,6 +5,8 @@
 #include "std_msgs/msg/bool.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "sensor_msgs/msg/joy.hpp"
+#include "capra_control_msgs/msg/flippers.hpp"
+#include "std_srvs/srv/trigger.hpp"
 
 namespace capra_joy_controls {
 
@@ -13,7 +15,9 @@ using axis_id = int;
 
 using Twist = geometry_msgs::msg::Twist;
 using Joy = sensor_msgs::msg::Joy;
+using Flippers = capra_control_msgs::msg::Flippers;
 using Bool = std_msgs::msg::Bool;
+using TriggerSrv = std_srvs::srv::Trigger;
 
 inline bool in_range(const float& v, const float& min = NAN, const float& max = NAN) {
     return !(std::isnan(v) || (!std::isnan(min) && v < min) || (!std::isnan(max) && v > max));

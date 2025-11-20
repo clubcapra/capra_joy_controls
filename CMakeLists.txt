@@ -9,8 +9,10 @@ endif()
 set(THIS_PROJECT_DEPEND
   rclcpp
   std_msgs
+  std_srvs
   geometry_msgs
   sensor_msgs
+  capra_control_msgs
 )
 
 # find dependencies

@@ -6,11 +6,20 @@
 
 namespace capra_joy_controls::parsable {
 
-struct Action : YAMLParsable {
+struct RunnableAction {
+    virtual void init(rclcpp::Node::SharedPtr node) {}
+    virtual void run(const JoyContext& context) = 0;
+};
+
+struct TwistAction {
+    virtual void update_twist(Twist& twist, Twist& twist_turbo) = 0;
+};
+
+struct Action : YAMLParsable, RunnableAction {
     // Twist publisher
-    struct TwistPub : YAMLParsable {
+    struct TwistPub : YAMLParsable, RunnableAction {
         // teleop_twist_joy-style twist publisher
-        struct TeleopTwistJoy : YAMLParsable {
+        struct TeleopTwistJoy : YAMLParsable, RunnableAction, TwistAction {
             // A yaw pitch roll container
             struct Angular : YAMLParsable {
                 Value yaw = 0, pitch = 0, roll = 0;
@@ -29,12 +38,16 @@ struct Action : YAMLParsable {
 
                 void parse_from(const YAML::Node& node) override;
             };
+            // Parameters
             Angular axis_angular{0, 0, 0};
             Linear axis_linear{0, 0, 0};
             Angular scale_angular{1, 1, 1};
             Linear scale_linear{1, 1, 1};
             Angular scale_angular_turbo{1, 1, 1};
             Linear scale_linear_turbo{1, 1, 1};
+
+            Twist _twist;
+            Twist _twist_turbo;
 
             TeleopTwistJoy() {}
             TeleopTwistJoy(
@@ -49,34 +62,57 @@ struct Action : YAMLParsable {
                 scale_angular{scale_angular},
                 scale_linear{scale_linear},
                 scale_angular_turbo{scale_angular_turbo},
-                scale_linear_turbo{scale_linear_turbo} 
+                scale_linear_turbo{scale_linear_turbo}
                 {}
             explicit TeleopTwistJoy(const YAML::Node& node) { parse_from(node); }
 
-            void parse_from(const YAML::Node& node);
+            void parse_from(const YAML::Node& node) override;
+            void run(const JoyContext& context) override;
+            void update_twist(Twist& twist, Twist& twist_turbo) override;
         };
         // Tank-style twist publisher
-        struct Tank : YAMLParsable {
+        struct Tank : YAMLParsable, RunnableAction, TwistAction {
+            // Parameters
             Value left = 0, right = 0;
             Value scale = 1;
             Value scale_turbo = 1;
+            float wheel_separation = 1;
+            float wheel_radius = 1;
+            float wheel_separation_multiplier = 1;
+            float left_wheel_radius_multiplier = -1;
+            float right_wheel_radius_multiplier = 1;
+
+            Twist _twist;
+            Twist _twist_turbo;
 
             Tank() = default;
             Tank(
                 const Value& left,
                 const Value& right,
                 const Value& scale = 1,
-                const Value& scale_turbo = 1
+                const Value& scale_turbo = 1,
+                const float& wheel_separation = 1,
+                const float& wheel_radius = 1,
+                const float& wheel_separation_multiplier = 1,
+                const float& left_wheel_radius_multiplier = -1,
+                const float& right_wheel_radius_multiplier = 1
             ) :
                 left{left},
                 right{right},
                 scale{scale},
-                scale_turbo{scale_turbo}
+                scale_turbo{scale_turbo},
+                wheel_separation{wheel_separation},
+                wheel_radius{wheel_radius},
+                wheel_separation_multiplier{wheel_separation_multiplier},
+                left_wheel_radius_multiplier{left_wheel_radius_multiplier},
+                right_wheel_radius_multiplier{right_wheel_radius_multiplier}
             {}
 
             explicit Tank(const YAML::Node& node) { parse_from(node); }
 
             void parse_from(const YAML::Node& node) override;
+            void update_twist(Twist& twist, Twist& twist_turbo) override;
+            void run(const JoyContext& context) override;
         };
 
         // Define twist types and parsing methods
@@ -89,11 +125,17 @@ struct Action : YAMLParsable {
         std::string topic = "~/cmd_vel";
         Trigger enable_button = 1;
         Trigger turbo_button = 0;
+        float rate = 20;
         bool publish_stamped_twist = false;
         std::variant<
             TeleopTwistJoy,
             Tank
         > value{TeleopTwistJoy()};
+
+        // Members
+        rclcpp::Publisher<Twist>::SharedPtr _twist_pub;
+        Twist _twist;
+        rclcpp::TimerBase::SharedPtr _timer;
 
         // Contructors
         TwistPub() = default;
@@ -102,26 +144,30 @@ struct Action : YAMLParsable {
             const std::string& topic = "~/cmd_vel",
             const Trigger& enable_button = Trigger::create_off(),
             const Trigger& turbo_button = Trigger::create_off(),
-            const bool& publish_stamped_twist = false
+            const bool& publish_stamped_twist = false,
+            const float& rate = 20
         ) : 
         value{twist},
         topic{topic},
         enable_button{enable_button},
         turbo_button{turbo_button},
-        publish_stamped_twist{publish_stamped_twist}
+        publish_stamped_twist{publish_stamped_twist},
+        rate{rate}
         {}
         TwistPub(
             const Tank& tank,
             const std::string& topic = "~/cmd_vel",
             const Trigger& enable_button = Trigger::create_off(),
             const Trigger& turbo_button = Trigger::create_off(),
-            const bool& publish_stamped_twist = false
+            const bool& publish_stamped_twist = false,
+            const float& rate = 20
         ) : 
         value{tank},
         topic{topic},
         enable_button{enable_button},
         turbo_button{turbo_button},
-        publish_stamped_twist{publish_stamped_twist}
+        publish_stamped_twist{publish_stamped_twist},
+        rate{rate}
         {}
         explicit TwistPub(const YAML::Node& node) { parse_from(node); }
 
@@ -131,14 +177,16 @@ struct Action : YAMLParsable {
             const std::string& topic = "~/cmd_vel",
             const Trigger& enable_button = Trigger::create_off(),
             const Trigger& turbo_button = Trigger::create_off(),
-            const bool& publish_stamped_twist = false
+            const bool& publish_stamped_twist = false,
+            const float& rate = 20
         ) {
             return TwistPub(
                 twist,
                 topic,
                 enable_button,
                 turbo_button,
-                publish_stamped_twist
+                publish_stamped_twist,
+                rate
             );
         }
         static TwistPub create_tank_joy(
@@ -146,30 +194,37 @@ struct Action : YAMLParsable {
             const std::string& topic = "~/cmd_vel",
             Trigger enable_button = Trigger::create_off(),
             Trigger turbo_button = Trigger::create_off(),
-            bool publish_stamped_twist = false
+            bool publish_stamped_twist = false,
+            const float& rate = 20
         ) {
             return TwistPub(
                 tank,
                 topic,
                 enable_button,
                 turbo_button,
-                publish_stamped_twist
+                publish_stamped_twist,
+                rate
             );
         }
 
         void parse_from(const YAML::Node& node) override;
+        void init(rclcpp::Node::SharedPtr node) override;
+        void run(const JoyContext& context) override;
+
+        void _task();
     };
 
     // FLippers publisher
-    struct FlippersPub : YAMLParsable {
-        struct Flippers : YAMLParsable { 
+    struct FlippersPub : YAMLParsable, RunnableAction {
+        struct FlippersValues : YAMLParsable { 
+            // Parameters
             Value front_left = 0;
             Value rear_left = 0;
             Value front_right = 0;
             Value rear_right = 0;
 
-            Flippers() {}
-            Flippers(
+            FlippersValues() {}
+            FlippersValues(
                 const Value& front_left,
                 const Value& rear_left,
                 const Value& front_right,
@@ -178,9 +233,9 @@ struct Action : YAMLParsable {
                 front_left{front_left},
                 rear_left{rear_left},
                 front_right{front_right},
-                rear_right{rear_right} 
+                rear_right{rear_right}
             {}
-            explicit Flippers(const YAML::Node& node) { parse_from(node); }
+            explicit FlippersValues(const YAML::Node& node) { parse_from(node); }
 
             void parse_from(const YAML::Node& node) override;
         };
@@ -188,10 +243,10 @@ struct Action : YAMLParsable {
         struct Preset : YAMLParsable {
             std::string name = "";
             Trigger trigger{};
-            Flippers positions{};
+            FlippersValues positions{};
 
             Preset() = default;
-            Preset(const std::string& name, const Trigger& trigger = Trigger(), const Flippers& positions = Flippers())
+            Preset(const std::string& name, const Trigger& trigger = Trigger(), const FlippersValues& positions = FlippersValues())
             : name{name}, trigger{trigger}, positions{positions} {}
             explicit Preset(const YAML::Node& node) { parse_from(node); }
             void parse_from(const YAML::Node& node) override;
@@ -201,21 +256,52 @@ struct Action : YAMLParsable {
         std::string topic = "~/flippers";
         Trigger enable{};
         std::vector<Preset> presets{};
-        Flippers movements{};
+        FlippersValues movements{};
+        float rate = 20;
+
+        // Members
+        rclcpp::Publisher<Flippers>::SharedPtr _flippers_pub;
+        Flippers _flippers;
+        rclcpp::TimerBase::SharedPtr _timer;
 
         FlippersPub() = default;
-        FlippersPub(const std::string& topic, const Trigger& enable = {}, const std::vector<Preset>& presets = {}, const Flippers& movements = {})
-        : topic{topic}, presets{presets}, movements{movements} {}
+        FlippersPub(
+            const std::string& topic,
+            const Trigger& enable = {},
+            const std::vector<Preset>& presets = {},
+            const FlippersValues& movements = {},
+            const float& rate = 20
+        )
+        : topic{topic}, presets{presets}, movements{movements}, rate{rate} {}
         explicit FlippersPub(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override;
+        void init(rclcpp::Node::SharedPtr node) override;
+        void run(const JoyContext& context) override;
+        void _task();
+        void _set_positions(
+            const float& front_left,
+            const float& rear_left,
+            const float& front_right,
+            const float& rear_right
+        );
+        void _set_velocities(
+            const float& front_left,
+            const float& rear_left,
+            const float& front_right,
+            const float& rear_right
+        );
     };
 
     // EStop publisher
-    struct EStopPub : YAMLParsable {
+    struct EStopPub : YAMLParsable, RunnableAction {
+        // Parameters
         std::string topic = "~/estop";
         Trigger latch = 0;
         Trigger unlatch = 0;
+
+        // Members
+        rclcpp::Publisher<Bool>::SharedPtr _estop_pub;
 
         EStopPub() = default;
         EStopPub(const std::string& topic, const Trigger& latch, const Trigger& unlatch)
@@ -223,11 +309,19 @@ struct Action : YAMLParsable {
         explicit EStopPub(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override;
+        void init(rclcpp::Node::SharedPtr node) override;
+        void run(const JoyContext& context) override;
     };
 
-    struct TriggerClient : YAMLParsable {
+    struct TriggerClient : YAMLParsable, RunnableAction {
+        // Parameters
         std::string service = "~/trigger";
         Trigger trigger = 0;
+
+        // Members
+        rclcpp::Client<TriggerSrv>::SharedPtr _client;
+        bool _lastValue;
+
 
         TriggerClient() = default;
         TriggerClient(const std::string& service, const Trigger& trigger)
@@ -235,6 +329,8 @@ struct Action : YAMLParsable {
         explicit TriggerClient(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override;
+        void init(rclcpp::Node::SharedPtr node) override;
+        void run(const JoyContext& context) override;
     };
 
     // Define action types and parsing methods
@@ -292,6 +388,7 @@ struct Action : YAMLParsable {
     explicit Action(const YAML::Node& node) { parse_from(node); }
 
     void parse_from(const YAML::Node& node) override;
+    void run(const JoyContext& context) override;
 };
 
 } // capra_joy_controls::parsable

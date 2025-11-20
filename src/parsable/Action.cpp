@@ -61,6 +61,33 @@ void Action::TwistPub::TeleopTwistJoy::parse_from(const YAML::Node &node)
     }
 }
 
+void Action::TwistPub::TeleopTwistJoy::run(const JoyContext &context)
+{
+    // Normal twist
+    _twist.angular.x = axis_angular.pitch.read(context) * scale_angular.pitch.read(context);
+    _twist.angular.y = axis_angular.roll.read(context) * scale_angular.roll.read(context);
+    _twist.angular.z = axis_angular.yaw.read(context) * scale_angular.yaw.read(context);
+
+    _twist.linear.x = axis_linear.x.read(context) * scale_linear.x.read(context);
+    _twist.linear.y = axis_linear.y.read(context) * scale_linear.y.read(context);
+    _twist.linear.z = axis_linear.z.read(context) * scale_linear.z.read(context);
+
+    // Turbo twist
+    _twist_turbo.angular.x = axis_angular.pitch.read(context) * scale_angular_turbo.pitch.read(context);
+    _twist_turbo.angular.y = axis_angular.roll.read(context) * scale_angular_turbo.roll.read(context);
+    _twist_turbo.angular.z = axis_angular.yaw.read(context) * scale_angular_turbo.yaw.read(context);
+
+    _twist_turbo.linear.x = axis_linear.x.read(context) * scale_linear_turbo.x.read(context);
+    _twist_turbo.linear.y = axis_linear.y.read(context) * scale_linear_turbo.y.read(context);
+    _twist_turbo.linear.z = axis_linear.z.read(context) * scale_linear_turbo.z.read(context);
+}
+
+void Action::TwistPub::TeleopTwistJoy::update_twist(Twist& twist, Twist& twist_turbo)
+{
+    twist = _twist;
+    twist_turbo = _twist_turbo;
+}
+
 void Action::TwistPub::Tank::parse_from(const YAML::Node &node)
 {
     expect_not_null(node);
@@ -70,12 +97,61 @@ void Action::TwistPub::Tank::parse_from(const YAML::Node &node)
     if (auto nleft = node["left"]) {
         left = Value(nleft);
     }
+    if (auto nright = node["right"]) {
+        right = Value(nright);
+    }
     if (auto nscale = node["scale"]) {
         scale = Value(nscale);
     }
     if (auto nscale_turbo = node["scale_turbo"]) {
         scale_turbo = Value(nscale_turbo);
     }
+    if (auto nwheel_separation = node["wheel_separation"]) {
+        wheel_separation = parse_value<float>(nwheel_separation);
+    }
+    if (auto nwheel_radius = node["wheel_radius"]) {
+        wheel_radius = parse_value<float>(nwheel_radius);
+    }
+    if (auto nwheel_separation_multiplier = node["wheel_separation_multiplier"]) {
+        wheel_separation_multiplier = parse_value<float>(nwheel_separation_multiplier);
+    }
+    if (auto nleft_wheel_radius_multiplier = node["left_wheel_radius_multiplier"]) {
+        left_wheel_radius_multiplier = parse_value<float>(nleft_wheel_radius_multiplier);
+    }
+    if (auto nright_wheel_radius_multiplier = node["right_wheel_radius_multiplier"]) {
+        right_wheel_radius_multiplier = parse_value<float>(nright_wheel_radius_multiplier);
+    }
+}
+
+void Action::TwistPub::Tank::update_twist(Twist& twist, Twist& twist_turbo)
+{
+    twist = _twist;
+    twist_turbo = _twist_turbo;
+}
+
+void Action::TwistPub::Tank::run(const JoyContext &context)
+{
+    // Read values
+    float left_axis = left.read(context);
+    float right_axis = right.read(context);
+    float normal_scale = scale.read(context);
+    float turbo_scale = scale_turbo.read(context);
+
+    // Apply multipliers
+    float ws = wheel_separation * wheel_separation_multiplier;
+    float lwr = wheel_radius * left_wheel_radius_multiplier;
+    float rwr = wheel_radius * right_wheel_radius_multiplier;
+
+    // Invert diff_drive equations
+    float lin = (left_axis * lwr + right_axis * rwr) / 2.0;
+    float ang = (right_axis * rwr - left_axis * lwr) / ws;
+
+
+    _twist.linear.x = lin * normal_scale;
+    _twist.angular.z = ang * normal_scale;
+
+    _twist_turbo.linear.x = lin * turbo_scale;
+    _twist_turbo.angular.z = ang * turbo_scale;
 }
 
 void Action::TwistPub::parse_from(const YAML::Node &node)
@@ -110,6 +186,9 @@ void Action::TwistPub::parse_from(const YAML::Node &node)
     if (auto npublish_stamped_twist = node["publish_stamped_twist"]) {
         publish_stamped_twist = parse_value<bool>(npublish_stamped_twist);
     }
+    if (auto nrate = node["rate"]) {
+        rate = parse_value<float>(nrate);
+    }
 
     if (auto nteleop = node["teleop_twist_joy"]) {
         value = TeleopTwistJoy(nteleop);
@@ -120,7 +199,63 @@ void Action::TwistPub::parse_from(const YAML::Node &node)
     }
 }
 
-void Action::FlippersPub::Flippers::parse_from(const YAML::Node &node)
+void Action::TwistPub::init(rclcpp::Node::SharedPtr node)
+{
+    _twist_pub = node->create_publisher<Twist>(topic, rclcpp::SystemDefaultsQoS());
+
+    auto period = std::chrono::nanoseconds(
+        static_cast<uint64_t>(1e9 / rate)
+    );
+
+    _timer = node->create_wall_timer(
+        period,
+        std::bind(&Action::TwistPub::_task, this)
+    );
+}
+
+void Action::TwistPub::run(const JoyContext &context)
+{
+    // Run actions
+    Twist normal_twist, turbo_twist;
+    switch (value.index()) {
+        case TwistMethod::teleop_twist_joy:
+        {
+            auto twist_joy = std::get<TeleopTwistJoy>(value);
+            twist_joy.run(context);
+            twist_joy.update_twist(normal_twist, turbo_twist);
+        }
+        break;
+        case TwistMethod::tank_joy:
+        {
+            auto tank_joy = std::get<Tank>(value);
+            tank_joy.run(context);
+            tank_joy.update_twist(normal_twist, turbo_twist);
+        }
+        break;
+        default:
+        break;
+    }
+
+    bool turbo = turbo_button.read(context);
+    // Get twist
+    if (!enable_button.read(context)) {
+        // Send zero
+        _twist = Twist();
+    } else {
+        if (!turbo) {
+            _twist = normal_twist;
+        } else {
+            _twist = turbo_twist;
+        }
+    }
+}
+
+void Action::TwistPub::_task()
+{
+    _twist_pub->publish(_twist);
+}
+
+void Action::FlippersPub::FlippersValues::parse_from(const YAML::Node &node)
 {
     expect_not_null(node);
     expect_defined(node);
@@ -152,7 +287,7 @@ void Action::FlippersPub::Preset::parse_from(const YAML::Node &node)
 
     auto npositions = node["positions"];
     expect_defined(npositions); // Required
-    positions = Flippers(npositions);
+    positions = FlippersValues(npositions);
 }
 
 void Action::FlippersPub::parse_from(const YAML::Node &node)
@@ -182,9 +317,76 @@ void Action::FlippersPub::parse_from(const YAML::Node &node)
     }
 
     if (auto nmovements = node["movements"]){
-        movements = Flippers(nmovements);
+        movements = FlippersValues(nmovements);
     }
     
+}
+
+void Action::FlippersPub::init(rclcpp::Node::SharedPtr node)
+{
+    _flippers_pub = node->create_publisher<Flippers>(topic, rclcpp::SystemDefaultsQoS());
+
+    auto period = std::chrono::nanoseconds(
+        static_cast<uint64_t>(1e9 / rate)
+    );
+
+    _timer = node->create_wall_timer(
+        period,
+        std::bind(&Action::FlippersPub::_task, this)
+    );
+}
+
+void Action::FlippersPub::run(const JoyContext &context)
+{
+    // Read values
+    float fl = movements.front_left.read(context);
+    float rl = movements.rear_left.read(context);
+    float fr = movements.front_right.read(context);
+    float rr = movements.rear_right.read(context);
+    bool en = enable.read(context);
+
+    for (auto p : presets) {
+        bool trig = p.trigger.read(context);
+        float pfl = p.positions.front_left.read(context);
+        float prl = p.positions.rear_left.read(context);
+        float pfr = p.positions.front_right.read(context);
+        float prr = p.positions.rear_right.read(context);
+
+        if (trig) {
+            // A position control command was sent
+            _set_positions(pfl, prl, pfr, prr);
+        }
+    }
+
+    auto is_small = [](const float& v){ return std::abs(v) < 0.01f; };
+
+    if (!is_small(fl) || !is_small(rl) || !is_small(fr) || !is_small(rr)) {
+        // Velocity control takes precedance
+        _set_velocities(fl, rl, fr, rr);
+    }
+}
+
+void Action::FlippersPub::_task()
+{
+    _flippers_pub->publish(_flippers);
+}
+
+void Action::FlippersPub::_set_positions(const float &front_left, const float &rear_left, const float &front_right, const float &rear_right)
+{
+    _flippers.control_mode = Flippers::POSITION_CONTROL_MODE;
+    _flippers.front_left = front_left;
+    _flippers.rear_left = rear_left;
+    _flippers.front_right = front_right;
+    _flippers.rear_right = rear_right;
+}
+
+void Action::FlippersPub::_set_velocities(const float &front_left, const float &rear_left, const float &front_right, const float &rear_right)
+{
+    _flippers.control_mode = Flippers::VELOCITY_CONTROL_MODE;
+    _flippers.front_left = front_left;
+    _flippers.rear_left = rear_left;
+    _flippers.front_right = front_right;
+    _flippers.rear_right = rear_right;
 }
 
 void Action::EStopPub::parse_from(const YAML::Node &node)
@@ -206,6 +408,28 @@ void Action::EStopPub::parse_from(const YAML::Node &node)
     unlatch = Trigger(nunlatch);
 }
 
+void Action::EStopPub::init(rclcpp::Node::SharedPtr node)
+{
+    _estop_pub = node->create_publisher<Bool>(topic, rclcpp::SystemDefaultsQoS());
+}
+
+void Action::EStopPub::run(const JoyContext &context)
+{
+    bool l = latch.read(context);
+    bool u = unlatch.read(context);
+
+    if (l) {
+        // Latching has precedence
+        Bool b;
+        b.data = true;
+        _estop_pub->publish(b);
+    } else {
+        Bool b;
+        b.data = false;
+        _estop_pub->publish(b);
+    }
+}
+
 void Action::TriggerClient::parse_from(const YAML::Node & node)
 {
     expect_not_null(node);
@@ -219,6 +443,16 @@ void Action::TriggerClient::parse_from(const YAML::Node & node)
     auto ntrigger = node["trigger"];
     expect_defined(ntrigger); // Required
     trigger = Trigger(ntrigger);
+}
+
+void Action::TriggerClient::init(rclcpp::Node::SharedPtr node)
+{
+    _client = node->create_client<TriggerSrv>(service);
+}
+
+void Action::TriggerClient::run(const JoyContext &context)
+{
+    // TODO Implement this
 }
 
 void Action::parse_from(const YAML::Node &node)
@@ -245,8 +479,28 @@ void Action::parse_from(const YAML::Node &node)
         value = TriggerClient(node);
         return;
     default:
-        THROW(YAMLParseException, node, "Unimplementd action '" + ntype.Scalar() + "'");
+        THROW(YAMLParseException, node, "Unimplemented action '" + ntype.Scalar() + "'");
     }
 }
 
+void Action::run(const JoyContext &context)
+{
+    switch (value.index())
+    {
+    case ActionType::twist_pub:
+        std::get<TwistPub>(value).run(context);
+        return;
+    case ActionType::flippers_pub:
+        std::get<FlippersPub>(value).run(context);
+        return;
+    case ActionType::estop_pub:
+        std::get<EStopPub>(value).run(context);
+        return;
+    case ActionType::trigger_client:
+        std::get<TriggerClient>(value).run(context);
+        return;
+    default:
+        break;
+    }
+}
 }
