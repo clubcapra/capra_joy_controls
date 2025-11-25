@@ -483,6 +483,27 @@ void Action::parse_from(const YAML::Node &node)
     }
 }
 
+void Action::init(rclcpp::Node::SharedPtr node)
+{
+    switch (value.index())
+    {
+    case ActionType::twist_pub:
+        std::get<TwistPub>(value).init(node);
+        return;
+    case ActionType::flippers_pub:
+        std::get<FlippersPub>(value).init(node);
+        return;
+    case ActionType::estop_pub:
+        std::get<EStopPub>(value).init(node);
+        return;
+    case ActionType::trigger_client:
+        std::get<TriggerClient>(value).init(node);
+        return;
+    default:
+        break;
+    }
+}
+
 void Action::run(const JoyContext &context)
 {
     switch (value.index())

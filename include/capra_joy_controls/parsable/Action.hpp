@@ -132,6 +132,10 @@ struct Action : YAMLParsable, RunnableAction {
             Tank
         > value{TeleopTwistJoy()};
 
+        TwistMethod type() const { return (TwistMethod)value.index(); }
+        GET_VARIANT(teleop_twist_joy, TeleopTwistJoy, value)
+        GET_VARIANT(tank_joy, Tank, value)
+
         // Members
         rclcpp::Publisher<Twist>::SharedPtr _twist_pub;
         Twist _twist;
@@ -388,6 +392,7 @@ struct Action : YAMLParsable, RunnableAction {
     explicit Action(const YAML::Node& node) { parse_from(node); }
 
     void parse_from(const YAML::Node& node) override;
+    void init(rclcpp::Node::SharedPtr node) override;
     void run(const JoyContext& context) override;
 };
 

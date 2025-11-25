@@ -14,4 +14,19 @@ void ControlScheme::parse_from(const YAML::Node &node)
     }
 }
 
+void ControlScheme::init(rclcpp::Node::SharedPtr node)
+{
+    RCLCPP_INFO(node->get_logger(), "Initializing control scheme %s", name);
+    for (auto a : actions) {
+        a.init(node);
+    }
+}
+
+void ControlScheme::run(const JoyContext &context)
+{
+    for (auto a : actions) {
+        a.run(context);
+    }
+}
+
 } // capra_joy_controls::parsable

@@ -15,5 +15,19 @@ void SchemeMap::parse_from(const YAML::Node &node)
     }
 }
 
-} // namespace capra_joy_controls::parsable
+void SchemeMap::init(rclcpp::Node::SharedPtr node)
+{
+    RCLCPP_INFO(node->get_logger(), "Initializing scheme map");
+    for (auto s : controlSchemes) {
+        s.init(node);
+    }
+}
 
+void SchemeMap::run(const JoyContext &context)
+{
+    for (auto s : controlSchemes) {
+        s.run(context);
+    }
+}
+
+} // namespace capra_joy_controls::parsable

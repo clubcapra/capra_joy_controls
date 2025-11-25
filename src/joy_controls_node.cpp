@@ -63,14 +63,35 @@ public:
         auto yaml_params = YAML::LoadFile(file);
         parse_params(yaml_params);
 
+        // Create subscribers
+        joy_sub_ = create_subscription<Joy>("~/joy", rclcpp::SystemDefaultsQoS(), std::bind(&JoyControlsNode::on_joy, this, std::placeholders::_1));
     }
+
+    void init() {
+        // Initialize scheme
+        map_.init(shared_from_this());
+    }
+
 private:
     void parse_params(const YAML::Node& node) {
         map_.parse_from(node);
     }
 
+    void on_joy(Joy::SharedPtr msg) {
+        context_.next(msg);
+        if (context_.current != nullptr && context_.last != nullptr) {
+            map_.run(context_);
+        }
+    }
+
+    // Context
+    JoyContext context_;
+
     // Parameters
     SchemeMap map_;
+
+    // Subscribers
+    rclcpp::Subscription<Joy>::SharedPtr joy_sub_;
 };
 } // namespace capra_joy_controls
 
