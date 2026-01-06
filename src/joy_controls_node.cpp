@@ -26,7 +26,7 @@ struct JoyFrame {
     int RB;         // Index: 5
     int VIEW;       // Index: 6
     int MENU;       // Index: 7
-    int XBOX;       // Index: 8  (xbox only)
+    int SUPER;      // Index: 8  (xbox btn or steamdeck btn)
     int LS_BTN;     // Index: 9
     int RS_BTN;     // Index: 10
     int SHARE;      // Index: 11 (xbox only)
