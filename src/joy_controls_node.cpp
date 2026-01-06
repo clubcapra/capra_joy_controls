@@ -50,10 +50,10 @@ struct JoyFrame {
     float R_TPAD_Y; // Index: 11    [-1;1] (up is 1)    (steamdeck only)
 };
 
-class JoyControlsNode : public rclcpp::Node {
+class JoyControlsNode : public ContainerNode {
 public:
     JoyControlsNode()
-        : Node("joy_controls", ""/*,
+        : ContainerNode("joy_controls", ""/*,
             rclcpp::NodeOptions().allow_undeclared_parameters(
             true).automatically_declare_parameters_from_overrides(true)*/)
     {
@@ -69,7 +69,8 @@ public:
 
     void init() {
         // Initialize scheme
-        map_.init(shared_from_this());
+        RCLCPP_INFO(get_logger(), "Initializing");
+        map_.init(*this);
     }
 
 private:
@@ -79,9 +80,7 @@ private:
 
     void on_joy(Joy::SharedPtr msg) {
         context_.next(msg);
-        if (context_.current != nullptr && context_.last != nullptr) {
-            map_.run(context_);
-        }
+        map_.run(context_);
     }
 
     // Context
@@ -97,7 +96,9 @@ private:
 
 int main(int argc, char *argv[]) {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<capra_joy_controls::JoyControlsNode>());
+    auto node = std::make_shared<capra_joy_controls::JoyControlsNode>();
+    node->init();
+    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
 }

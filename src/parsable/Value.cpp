@@ -13,6 +13,7 @@ void Value::Constant::parse_from(const YAML::Node &node)
 
 float Value::Constant::read(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Reading axis constant");
     return value;
 }
 
@@ -43,6 +44,7 @@ void Value::Axis::parse_from(const YAML::Node &node)
 
 float Value::Axis::read(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Reading axis");
     return context.axis(id);
 }
 
@@ -102,6 +104,7 @@ void Value::Condition::parse_from(const YAML::Node& node)
 
 float Value::Condition::read(const JoyContext& context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Reading axis condition");
     auto eval = [&](){
         switch (oper)
         {
@@ -185,6 +188,7 @@ void Value::parse_from(const YAML::Node &node)
 
 float Value::read(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Reading value");
     switch (type())
     {
     case ValueType::constant:

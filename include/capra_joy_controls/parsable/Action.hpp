@@ -7,7 +7,7 @@
 namespace capra_joy_controls::parsable {
 
 struct RunnableAction {
-    virtual void init(rclcpp::Node::SharedPtr node) {}
+    virtual void init(ContainerNode& node) {}
     virtual void run(const JoyContext& context) = 0;
 };
 
@@ -212,7 +212,7 @@ struct Action : YAMLParsable, RunnableAction {
         }
 
         void parse_from(const YAML::Node& node) override;
-        void init(rclcpp::Node::SharedPtr node) override;
+        void init(ContainerNode& node) override;
         void run(const JoyContext& context) override;
 
         void _task();
@@ -280,7 +280,7 @@ struct Action : YAMLParsable, RunnableAction {
         explicit FlippersPub(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override;
-        void init(rclcpp::Node::SharedPtr node) override;
+        void init(ContainerNode& node) override;
         void run(const JoyContext& context) override;
         void _task();
         void _set_positions(
@@ -313,7 +313,7 @@ struct Action : YAMLParsable, RunnableAction {
         explicit EStopPub(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override;
-        void init(rclcpp::Node::SharedPtr node) override;
+        void init(ContainerNode& node) override;
         void run(const JoyContext& context) override;
     };
 
@@ -333,7 +333,7 @@ struct Action : YAMLParsable, RunnableAction {
         explicit TriggerClient(const YAML::Node& node) { parse_from(node); }
 
         void parse_from(const YAML::Node& node) override;
-        void init(rclcpp::Node::SharedPtr node) override;
+        void init(ContainerNode& node) override;
         void run(const JoyContext& context) override;
     };
 
@@ -392,7 +392,7 @@ struct Action : YAMLParsable, RunnableAction {
     explicit Action(const YAML::Node& node) { parse_from(node); }
 
     void parse_from(const YAML::Node& node) override;
-    void init(rclcpp::Node::SharedPtr node) override;
+    void init(ContainerNode& node) override;
     void run(const JoyContext& context) override;
 };
 

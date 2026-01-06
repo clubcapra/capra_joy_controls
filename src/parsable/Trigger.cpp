@@ -5,11 +5,13 @@ namespace capra_joy_controls::parsable {
 
 bool Trigger::Off::read(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Reading off");
     return false;
 }
 
 bool Trigger::On::read(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Reading on");
     return true;
 }
 
@@ -46,6 +48,7 @@ void Trigger::Button::parse_from(const YAML::Node &node)
 
 bool Trigger::Button::read(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Reading button");
     switch (event)
     {
     case ButtonEventType::held:
@@ -94,6 +97,7 @@ void Trigger::AxisRange::parse_from(const YAML::Node &node)
 
 bool Trigger::AxisRange::read(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Reading axis range");
     switch (event)
     {
     case AxisRangeEventType::inside:
@@ -165,6 +169,7 @@ void Trigger::Condition::parse_from(const YAML::Node &node)
 
 bool Trigger::Condition::read(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Reading condition");
     auto eval = [&](){
         switch (oper)
         {
@@ -258,6 +263,7 @@ void Trigger::parse_from(const YAML::Node &node)
 
 bool Trigger::read(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Reading trigger");
     switch (type()) {
         case TriggerType::button:
             return get_button()->read(context);

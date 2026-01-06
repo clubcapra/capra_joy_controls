@@ -15,7 +15,7 @@ struct ControlScheme : YAMLParsable, RunnableAction {
     ControlScheme(const YAML::Node& node) { parse_from(node); }
 
     void parse_from(const YAML::Node& node) override;
-    void init(rclcpp::Node::SharedPtr node) override;
+    void init(ContainerNode& node) override;
     void run(const JoyContext& context) override;
 };
 

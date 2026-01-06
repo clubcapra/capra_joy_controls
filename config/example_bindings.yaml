@@ -3,6 +3,7 @@ legacy_controls: # Bindings name
     type: "twist_pub" # Action type
 
     topic: "/rove/cmd_vel"
+    rate: 20
     enable_button:
       button: 0
     publish_stamped_twist: true
@@ -39,6 +40,7 @@ legacy_controls: # Bindings name
   flippers: # Control name
     type: "flippers_pub"
     topic: "/rove/flippers"
+    rate: 20
     enable:
       button: 0 # A
     # presets:
@@ -149,7 +151,7 @@ tank_controls:
   tank_control:
     type: "twist_pub"
 
-    topic: "/rove/cmd_vel"
+    topic: "/rove/cmd_vel2"
     enable_button:
       button: 4 # LB
     publish_stamped_twist: true
@@ -166,7 +168,7 @@ tank_controls:
   flippers:
     type: "flippers_pub"
 
-    topic: "/rove/flippers"
+    topic: "/rove/flippers2"
     enable:
       button: 5 # RB
     

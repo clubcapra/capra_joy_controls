@@ -210,6 +210,49 @@ TEST(capra_joy_controls_example, example_config)
     ASSERT_EQ(map.controlSchemes[0].name, "legacy_controls");
 }
 
+struct Foo {
+    int x = 10;
+};
+
+struct MyObject {
+    std::shared_ptr<Foo> create_foo() {
+        return std::make_shared<Foo>();
+    }
+};
+
+struct Bar {
+    std::shared_ptr<Foo> myFoo;
+    void init(MyObject& obj) {
+        myFoo = obj.create_foo();
+    }
+};
+
+struct FooBar {
+    std::variant<Bar, int> value;
+
+    FooBar(const Bar& v) {
+        value = v;
+    }
+
+    void init(MyObject& obj) {
+        if (value.index() == 0) {
+            std::get<Bar>(value).init(obj);
+        }
+    }
+};
+
+TEST(memory_issue, variant_release)
+{
+    auto obj = MyObject();
+
+    auto fb = FooBar(Bar());
+
+    fb.init(obj);
+
+    ASSERT_TRUE(std::get<Bar>(fb.value).myFoo);
+    ASSERT_EQ(std::get<Bar>(fb.value).myFoo->x, 10);
+}
+
 int main(int argc, char** argv)
 {
     testing::InitGoogleTest(&argc, argv);

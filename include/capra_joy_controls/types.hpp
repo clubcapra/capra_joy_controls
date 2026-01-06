@@ -33,40 +33,78 @@ struct JoyContext {
 
     bool button(const btn_id& id) const {
         if (!current) return false;
+        if (current->buttons.size() <= id) return false;
         return current->buttons[id];
     }
 
     bool rising(const btn_id& id) const {
         if (!last || !current) return false;
+        if (current->buttons.size() <= id) return false;
         if (last->buttons[id] == -1 || current->buttons[id] == -1) return false;
         return !last->buttons[id] && current->buttons[id];
     }
 
     bool falling(const btn_id& id) const {
         if (!last || !current) return false;
+        if (current->buttons.size() <= id) return false;
         if (last->buttons[id] == -1 || current->buttons[id] == -1) return false;
         return last->buttons[id] && !current->buttons[id];
     }
 
     float axis(const axis_id& id) const {
         if (!current) return 0.f;
+        if (current->axes.size() <= id) return 0.f;
         return current->axes[id];
     }
 
     bool inside(const axis_id& id, const float& min = NAN, const float& max = NAN) const {
         if (!current) return false;
+        if (current->axes.size() <= id) return false;
         return in_range(current->axes[id], min, max);
     }
 
     bool entered(const axis_id& id, const float& min = NAN, const float& max = NAN) const {
         if (!last || !current) return false;
+        if (current->axes.size() <= id) return false;
         return !in_range(last->axes[id], min, max) && in_range(current->axes[id], min, max);
     }
 
     bool exited(const axis_id& id, const float& min = NAN, const float& max = NAN) const {
         if (!last || !current) return false;
+        if (current->axes.size() <= id) return false;
         return in_range(last->axes[id], min, max) && !in_range(current->axes[id], min, max);
     }
+};
+
+class ContainerNode;
+
+class ContainerNode : public rclcpp::Node, std::enable_shared_from_this<ContainerNode> {
+public:
+    RCLCPP_SMART_PTR_DEFINITIONS(ContainerNode)
+
+    explicit ContainerNode(
+    const std::string & node_name,
+    const rclcpp::NodeOptions & options = rclcpp::NodeOptions()) : rclcpp::Node(node_name, options) {}
+
+    explicit ContainerNode(
+    const std::string & node_name,
+    const std::string & namespace_,
+    const rclcpp::NodeOptions & options = rclcpp::NodeOptions()) : rclcpp::Node(node_name, namespace_, options) {}
+
+    virtual ~ContainerNode() = default;
+
+    void add_resource(rclcpp::PublisherBase::SharedPtr res) { publishers_.emplace_back(res); }
+    void add_resource(rclcpp::SubscriptionBase::SharedPtr res) { subscribers_.emplace_back(res); }
+    void add_resource(rclcpp::ServiceBase::SharedPtr res) { services_.emplace_back(res); }
+    void add_resource(rclcpp::ClientBase::SharedPtr res) { clients_.emplace_back(res); }
+    void add_resource(rclcpp::TimerBase::SharedPtr res) { timers_.emplace_back(res); }
+
+private:
+    std::vector<rclcpp::PublisherBase::SharedPtr> publishers_{};
+    std::vector<rclcpp::SubscriptionBase::SharedPtr> subscribers_{};
+    std::vector<rclcpp::ServiceBase::SharedPtr> services_{};
+    std::vector<rclcpp::ClientBase::SharedPtr> clients_{};
+    std::vector<rclcpp::TimerBase::SharedPtr> timers_{};
 };
 
 } // capra_joy_controls

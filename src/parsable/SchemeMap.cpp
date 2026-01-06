@@ -15,9 +15,9 @@ void SchemeMap::parse_from(const YAML::Node &node)
     }
 }
 
-void SchemeMap::init(rclcpp::Node::SharedPtr node)
+void SchemeMap::init(ContainerNode& node)
 {
-    RCLCPP_INFO(node->get_logger(), "Initializing scheme map");
+    RCLCPP_INFO(node.get_logger(), "Initializing scheme map");
     for (auto s : controlSchemes) {
         s.init(node);
     }
@@ -25,7 +25,10 @@ void SchemeMap::init(rclcpp::Node::SharedPtr node)
 
 void SchemeMap::run(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Running scheme map");
+    int i = 0;
     for (auto s : controlSchemes) {
+        // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Running scheme map[%d]", i++);
         s.run(context);
     }
 }

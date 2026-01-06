@@ -63,6 +63,7 @@ void Action::TwistPub::TeleopTwistJoy::parse_from(const YAML::Node &node)
 
 void Action::TwistPub::TeleopTwistJoy::run(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Running teleop twist joy");
     // Normal twist
     _twist.angular.x = axis_angular.pitch.read(context) * scale_angular.pitch.read(context);
     _twist.angular.y = axis_angular.roll.read(context) * scale_angular.roll.read(context);
@@ -131,6 +132,7 @@ void Action::TwistPub::Tank::update_twist(Twist& twist, Twist& twist_turbo)
 
 void Action::TwistPub::Tank::run(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Running tank");
     // Read values
     float left_axis = left.read(context);
     float right_axis = right.read(context);
@@ -188,6 +190,8 @@ void Action::TwistPub::parse_from(const YAML::Node &node)
     }
     if (auto nrate = node["rate"]) {
         rate = parse_value<float>(nrate);
+    } else {
+        rate = 20.f;
     }
 
     if (auto nteleop = node["teleop_twist_joy"]) {
@@ -199,22 +203,32 @@ void Action::TwistPub::parse_from(const YAML::Node &node)
     }
 }
 
-void Action::TwistPub::init(rclcpp::Node::SharedPtr node)
+void Action::TwistPub::init(ContainerNode& node)
 {
-    _twist_pub = node->create_publisher<Twist>(topic, rclcpp::SystemDefaultsQoS());
+    RCLCPP_INFO(node.get_logger(), "Initializing twist pub at topic %s at %fHz", topic.c_str(), rate);
+    _twist_pub = node.create_publisher<Twist>(topic, rclcpp::SystemDefaultsQoS());
+    node.add_resource(_twist_pub);
+    if (!_twist_pub) {
+        RCLCPP_ERROR(node.get_logger(), "Unable to create publisher");
+    } else {
+        RCLCPP_INFO(node.get_logger(), "Successfully created publisher %d", _twist_pub.use_count());
+    }
+    RCLCPP_INFO(node.get_logger(), "Successfully created publisher %d", _twist_pub.use_count());
 
     auto period = std::chrono::nanoseconds(
         static_cast<uint64_t>(1e9 / rate)
     );
 
-    _timer = node->create_wall_timer(
+    _timer = node.create_wall_timer(
         period,
         std::bind(&Action::TwistPub::_task, this)
     );
+    node.add_resource(_timer);
 }
 
 void Action::TwistPub::run(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Running twist pub");
     // Run actions
     Twist normal_twist, turbo_twist;
     switch (value.index()) {
@@ -248,11 +262,16 @@ void Action::TwistPub::run(const JoyContext &context)
             _twist = turbo_twist;
         }
     }
+    _task();
 }
 
 void Action::TwistPub::_task()
 {
-    _twist_pub->publish(_twist);
+    RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Twist pub task %d", _twist_pub.use_count());
+    if (this->_twist_pub) {
+        RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Twist pub publishing");
+        this->_twist_pub->publish(this->_twist);
+    }
 }
 
 void Action::FlippersPub::FlippersValues::parse_from(const YAML::Node &node)
@@ -322,15 +341,16 @@ void Action::FlippersPub::parse_from(const YAML::Node &node)
     
 }
 
-void Action::FlippersPub::init(rclcpp::Node::SharedPtr node)
+void Action::FlippersPub::init(ContainerNode& node)
 {
-    _flippers_pub = node->create_publisher<Flippers>(topic, rclcpp::SystemDefaultsQoS());
+    RCLCPP_INFO(node.get_logger(), "Initializing flippers pub at topic %s at %fHz", topic.c_str(), rate);
+    _flippers_pub = node.create_publisher<Flippers>(topic, rclcpp::SystemDefaultsQoS());
 
     auto period = std::chrono::nanoseconds(
         static_cast<uint64_t>(1e9 / rate)
     );
 
-    _timer = node->create_wall_timer(
+    _timer = node.create_wall_timer(
         period,
         std::bind(&Action::FlippersPub::_task, this)
     );
@@ -338,6 +358,7 @@ void Action::FlippersPub::init(rclcpp::Node::SharedPtr node)
 
 void Action::FlippersPub::run(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Running flippers pub");
     // Read values
     float fl = movements.front_left.read(context);
     float rl = movements.rear_left.read(context);
@@ -368,7 +389,8 @@ void Action::FlippersPub::run(const JoyContext &context)
 
 void Action::FlippersPub::_task()
 {
-    _flippers_pub->publish(_flippers);
+    RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Flippers pub task");
+    if (_flippers_pub) _flippers_pub->publish(_flippers);
 }
 
 void Action::FlippersPub::_set_positions(const float &front_left, const float &rear_left, const float &front_right, const float &rear_right)
@@ -408,13 +430,14 @@ void Action::EStopPub::parse_from(const YAML::Node &node)
     unlatch = Trigger(nunlatch);
 }
 
-void Action::EStopPub::init(rclcpp::Node::SharedPtr node)
+void Action::EStopPub::init(ContainerNode& node)
 {
-    _estop_pub = node->create_publisher<Bool>(topic, rclcpp::SystemDefaultsQoS());
+    _estop_pub = node.create_publisher<Bool>(topic, rclcpp::SystemDefaultsQoS());
 }
 
 void Action::EStopPub::run(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Running estop pub");
     bool l = latch.read(context);
     bool u = unlatch.read(context);
 
@@ -422,11 +445,11 @@ void Action::EStopPub::run(const JoyContext &context)
         // Latching has precedence
         Bool b;
         b.data = true;
-        _estop_pub->publish(b);
+        if (_estop_pub) _estop_pub->publish(b);
     } else {
         Bool b;
         b.data = false;
-        _estop_pub->publish(b);
+        if (_estop_pub) _estop_pub->publish(b);
     }
 }
 
@@ -445,9 +468,9 @@ void Action::TriggerClient::parse_from(const YAML::Node & node)
     trigger = Trigger(ntrigger);
 }
 
-void Action::TriggerClient::init(rclcpp::Node::SharedPtr node)
+void Action::TriggerClient::init(ContainerNode& node)
 {
-    _client = node->create_client<TriggerSrv>(service);
+    _client = node.create_client<TriggerSrv>(service);
 }
 
 void Action::TriggerClient::run(const JoyContext &context)
@@ -483,7 +506,7 @@ void Action::parse_from(const YAML::Node &node)
     }
 }
 
-void Action::init(rclcpp::Node::SharedPtr node)
+void Action::init(ContainerNode& node)
 {
     switch (value.index())
     {
@@ -506,6 +529,7 @@ void Action::init(rclcpp::Node::SharedPtr node)
 
 void Action::run(const JoyContext &context)
 {
+    // RCLCPP_INFO(rclcpp::get_logger("joy_controls"), "Running action");
     switch (value.index())
     {
     case ActionType::twist_pub:
