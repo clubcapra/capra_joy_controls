@@ -30,10 +30,16 @@ struct JoyFrame {
     int LS_BTN;     // Index: 9
     int RS_BTN;     // Index: 10
     int SHARE;      // Index: 11 (xbox only)
-    int LB4;        // Index: 12 (steamdeck only)
-    int LB5;        // Index: 13 (steamdeck only)
-    int RB4;        // Index: 14 (steamdeck only)
-    int RB5;        // Index: 15 (steamdeck only)
+    int DPAD_UP;    // Index: 12
+    int DPAD_DOWN;  // Index: 13
+    int DPAD_LEFT;  // Index: 14
+    int DPAD_RIGHT; // Index: 15
+    int LT_BTN;     // Index: 16
+    int RT_BTN;     // Index: 17
+    int LB4;        // Index: 18 (steamdeck only)
+    int LB5;        // Index: 19 (steamdeck only)
+    int RB4;        // Index: 20 (steamdeck only)
+    int RB5;        // Index: 21 (steamdeck only)
 
     // Axes
     float LS_X;     // Index: 0     [-1;1] (left is -1)
