@@ -40,6 +40,8 @@ struct JoyFrame {
     int LB5;        // Index: 19 (steamdeck only)
     int RB4;        // Index: 20 (steamdeck only)
     int RB5;        // Index: 21 (steamdeck only)
+    int L_TPAD_BTN; // Index: 22 (steamdeck only)
+    int R_TPAD_BTN; // Index: 23 (steamdeck only)
 
     // Axes
     float LS_X;     // Index: 0     [-1;1] (left is -1)
